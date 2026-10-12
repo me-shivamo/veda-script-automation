@@ -6,6 +6,7 @@ import os
 import re
 import secrets
 import time
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -68,7 +69,18 @@ class Run:
 RUNS: dict[str, Run] = {}
 
 
-app = FastAPI(title="Veda Script Automation")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    JOBS.mkdir(parents=True, exist_ok=True)
+    yield
+    # On shutdown, stop the runs still in progress so each one records that it was stopped.
+    tasks = [run.task for run in RUNS.values() if run.task and not run.task.done()]
+    for task in tasks:
+        task.cancel()
+    await asyncio.gather(*tasks, return_exceptions=True)
+
+
+app = FastAPI(title="Veda Script Automation", lifespan=lifespan)
 
 
 def _signed_in(header: str) -> bool:

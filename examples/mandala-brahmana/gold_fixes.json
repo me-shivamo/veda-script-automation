@@ -1,0 +1,23 @@
+[
+  {
+    "reason": "side heading belongs with the next mantra (user confirmed 2026-10-12)",
+    "field": "bhashya",
+    "text": "लक्ष्यत्रयावलोकनेन तारकप्राप्तिः",
+    "remove_from": "1.2.4",
+    "add_to": "1.2.5"
+  },
+  {
+    "reason": "side heading belongs with the next mantra (user confirmed 2026-10-12)",
+    "field": "bhashya",
+    "text": "पूर्णिमादृष्टेः शाम्भवीपर्यवसानम्",
+    "remove_from": "2.1.7",
+    "add_to": "2.1.8"
+  },
+  {
+    "reason": "heading was duplicated into the upanishad column",
+    "field": "upanishad",
+    "text": "प्रणवस्वरूपप्रत्यक्प्रकाशानुभवः, तचिहानि च",
+    "remove_from": "2.2.1",
+    "add_to": null
+  }
+]

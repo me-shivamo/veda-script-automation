@@ -1,14 +1,16 @@
 """Web interface: load a book and a request, watch the agents work, approve the plan, read the output."""
 
 import asyncio
+import base64
 import os
 import re
+import secrets
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from pydantic_ai.exceptions import AgentRunError
@@ -23,6 +25,8 @@ ROOT = Path(__file__).resolve().parent.parent
 STATIC = Path(__file__).resolve().parent / "static"
 EXAMPLES = ROOT / "examples"
 JOBS = ROOT / "jobs"
+APP_USERNAME = os.environ.get("APP_USERNAME", "veda")
+APP_PASSWORD = os.environ.get("APP_PASSWORD", "")  # when set, every page and API call asks for it
 JOB_ID = re.compile(r"^\d{8}-\d{6}-[a-z0-9-]+$")
 MAX_INPUT_CHARS = 5_000_000
 
@@ -60,6 +64,27 @@ RUNS: dict[str, Run] = {}
 
 
 app = FastAPI(title="Veda Script Automation")
+
+
+def _signed_in(header: str) -> bool:
+    scheme, _, encoded = header.partition(" ")
+    if scheme.lower() != "basic":
+        return False
+    try:
+        username, _, password = base64.b64decode(encoded).decode("utf-8").partition(":")
+    except ValueError:
+        return False
+    # Compare both in constant time so the check does not leak how much of a guess was right.
+    return secrets.compare_digest(username.encode(), APP_USERNAME.encode()) & secrets.compare_digest(password.encode(), APP_PASSWORD.encode())
+
+
+@app.middleware("http")
+async def require_password(request, call_next):
+    """With APP_PASSWORD set, the browser asks for a username and password before showing anything."""
+    if APP_PASSWORD and request.url.path != "/healthz" and not _signed_in(request.headers.get("authorization", "")):
+        return PlainTextResponse("Sign in to continue.", status_code=401,
+                                 headers={"WWW-Authenticate": 'Basic realm="Veda Script Automation", charset="UTF-8"'})
+    return await call_next(request)
 
 
 @app.middleware("http")

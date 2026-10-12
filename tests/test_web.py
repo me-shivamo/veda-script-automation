@@ -116,3 +116,21 @@ def test_run_without_approval_step_and_bad_requests(client):
     assert client.post("/api/runs", json={"input": "x", "request": "x", "model": "made/up"}).status_code == 422
     assert client.get("/api/runs/../../etc").status_code == 404
     assert client.get("/api/runs/20200101-000000-missing").status_code == 404
+
+
+def basic(username, password):
+    import base64
+    return {"Authorization": "Basic " + base64.b64encode(f"{username}:{password}".encode()).decode()}
+
+
+def test_password_protects_everything_except_the_health_check(client, monkeypatch):
+    monkeypatch.setattr(web, "APP_PASSWORD", "open sesame")
+    for path in ("/", "/api/config", "/api/runs", "/static/app.js"):
+        response = client.get(path)
+        assert response.status_code == 401 and response.headers["www-authenticate"].startswith("Basic"), path
+    assert client.post("/api/runs", json={"input": "x", "request": "x"}).status_code == 401
+    assert client.get("/healthz").json() == {"ok": True}
+    for wrong in (basic("veda", "wrong"), basic("someone", "open sesame"), {"Authorization": "Basic not-base64!"}, {"Authorization": "Bearer open sesame"}):
+        assert client.get("/api/config", headers=wrong).status_code == 401
+    assert client.get("/api/config", headers=basic("veda", "open sesame")).status_code == 200
+    assert "Veda Script Automation" in client.get("/", headers=basic("veda", "open sesame")).text

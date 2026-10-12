@@ -173,6 +173,12 @@ def config() -> dict:
     return {"default_model": DEFAULT_MODEL, "models": MODELS, "key_configured": bool(os.environ.get("OPENROUTER_API_KEY")), "samples": samples}
 
 
+@app.get("/healthz")
+def health() -> dict:
+    """For the host's health check. Never asks for a password."""
+    return {"ok": True}
+
+
 @app.get("/api/samples/{sample_id}")
 def sample(sample_id: str) -> dict:
     folder = EXAMPLES / sample_id

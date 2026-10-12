@@ -1,0 +1,17 @@
+# Render Blueprint: describes the service so Render can create it from this repository.
+# Reference: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: veda-script-automation
+    runtime: docker
+    plan: free            # see docs/DOCUMENTATION.md, "Keeping runs permanently", before relying on this
+    region: singapore     # the Render region nearest to India
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit   # redeploy whenever the deployed branch gets a new commit
+    envVars:
+      - key: OPENROUTER_API_KEY
+        sync: false             # Render asks you for this when you create the service
+      - key: APP_USERNAME
+        value: veda
+      - key: APP_PASSWORD
+        generateValue: true     # Render makes a random password; read or change it under Environment

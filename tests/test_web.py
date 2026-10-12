@@ -134,3 +134,14 @@ def test_password_protects_everything_except_the_health_check(client, monkeypatc
         assert client.get("/api/config", headers=wrong).status_code == 401
     assert client.get("/api/config", headers=basic("veda", "open sesame")).status_code == 200
     assert "Veda Script Automation" in client.get("/", headers=basic("veda", "open sesame")).text
+
+
+def test_only_a_few_runs_at_once(client, monkeypatch):
+    monkeypatch.setattr(web, "MAX_ACTIVE_RUNS", 1)
+    first = start(client)
+    wait_for(client, first, {"awaiting_approval"})
+    refused = client.post("/api/runs", json={"name": "second", "input": BOOK, "request": "one row per mantra"})
+    assert refused.status_code == 429 and "already in progress" in refused.json()["detail"]
+    client.post(f"/api/runs/{first}/decision", json={"action": "stop"})
+    wait_for(client, first, {"stopped"})
+    assert client.post("/api/runs", json={"name": "second", "input": BOOK, "request": "one row per mantra"}).status_code == 200

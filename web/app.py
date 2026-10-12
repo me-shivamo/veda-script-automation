@@ -27,6 +27,7 @@ EXAMPLES = ROOT / "examples"
 JOBS = ROOT / "jobs"
 APP_USERNAME = os.environ.get("APP_USERNAME", "veda")
 APP_PASSWORD = os.environ.get("APP_PASSWORD", "")  # when set, every page and API call asks for it
+MAX_ACTIVE_RUNS = int(os.environ.get("MAX_ACTIVE_RUNS", "3"))
 JOB_ID = re.compile(r"^\d{8}-\d{6}-[a-z0-9-]+$")
 MAX_INPUT_CHARS = 5_000_000
 
@@ -223,6 +224,9 @@ def list_runs() -> list[dict]:
 async def start_run(body: NewRun) -> dict:
     if not any(m["id"] == body.model for m in MODELS):
         raise HTTPException(422, "That model is not in the list.")
+    active = sum(1 for run in RUNS.values() if run.phase in ACTIVE)
+    if active >= MAX_ACTIVE_RUNS:
+        raise HTTPException(429, f"{active} runs are already in progress. Wait for one to finish, then try again.")
     job = Job.create(body.input, body.request, examples=body.examples, name=body.name, root=JOBS)
     job.save_json("meta.json", {"name": body.name.strip() or "book", "model": body.model, "created": time.time()})
     run = Run(job=job)

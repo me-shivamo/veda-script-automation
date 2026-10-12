@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#14523c">
+  <title>Veda Script Automation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Arya:wght@400;700&family=Philosopher:wght@400;700&family=Tiro+Devanagari+Sanskrit&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div class="scroll-progress" aria-hidden="true"><div id="scrollBar"></div></div>
+
+  <header class="hero">
+    <div class="hero__image" role="img" aria-label="The Statue of Oneness: Adi Shankaracharya as a young monk, holding a staff"></div>
+    <div class="hero__shade" aria-hidden="true"></div>
+    <div class="aurora" aria-hidden="true"></div>
+    <div class="container hero__inner">
+      <div class="topbar">
+        <a class="brand" href="#top" aria-label="Veda Script Automation">
+          <svg class="brand__mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3c2.6 3.2 4 5.7 4 7.9a4 4 0 1 1-8 0C12 8.700 13.4 6.200 16 3Z" fill="#f5761a"/><path d="M5 18h22c0 5.500-4.900 9-11 9S5 23.500 5 18Z" fill="#f7893a"/><path d="M3 17.200h26" stroke="#fde2cb" stroke-width="1.600" stroke-linecap="round"/></svg>
+          <span>
+            <span class="brand__name">Veda Script Automation</span>
+            <span class="brand__sub">Sanskrit texts, structured as printed</span>
+          </span>
+        </a>
+        <nav class="topbar__nav" aria-label="Sections">
+          <a class="pill-link" href="#workspace">New extraction</a>
+          <a class="pill-link" href="#runs">Past runs</a>
+        </nav>
+      </div>
+
+      <div class="hero__copy">
+        <p class="eyebrow eyebrow--light">Scanned page to structured text</p>
+        <h1>Every shloka.<br>In its place.</h1>
+        <div class="rule" aria-hidden="true"><span></span><svg viewBox="0 0 24 24"><path d="M12 3l3.200 5.800L21 12l-5.800 3.200L12 21l-3.200-5.800L3 12l5.800-3.200Z" fill="#f5761a"/></svg><span></span></div>
+        <p class="hero__lead">Load the OCR text of a Sanskrit book and say what you need. You get one row for each shloka with its commentary, copied exactly as printed.</p>
+        <div class="hero__actions">
+          <a class="button button--lg button--primary" href="#workspace">Start an extraction</a>
+          <a class="pill-link pill-link--lg" href="#how">How it works</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="strip" aria-label="What the agents read">
+    <div class="container strip__row">
+      <span class="badge">What it reads</span>
+      <div class="chips">
+        <span class="chip"><span class="sa" lang="sa">मूल</span> root text</span>
+        <span class="chip"><span class="sa" lang="sa">भाष्य · टीका</span> commentary</span>
+        <span class="chip"><span class="sa" lang="sa">अर्थ · अन्वय</span> meaning</span>
+        <span class="chip">Side headings</span>
+        <span class="chip">Verse numbers</span>
+        <span class="chip">Section closers</span>
+        <span class="chip chip--muted">Page headers removed</span>
+        <span class="chip chip--muted">Footnotes removed</span>
+      </div>
+    </div>
+  </section>
+
+  <main id="top">
+    <section class="section section--dawn" id="workspace">
+      <div class="container">
+        <p class="eyebrow">New extraction</p>
+        <h2>Load a book and say what you need</h2>
+
+        <div class="banner banner--warn" id="keyWarning" hidden>The OpenRouter API key is not set. Put <code>OPENROUTER_API_KEY</code> in the <code>.env</code> file and restart the server.</div>
+
+        <div class="workspace">
+          <article class="card">
+            <p class="eyebrow">Step 1</p>
+            <h3>The book</h3>
+            <p class="muted">OCR text, with pages separated by lines of <code>---</code>.</p>
+            <label class="dropzone" id="dropzone">
+              <input type="file" id="inputFile" accept=".md,.txt,text/plain,text/markdown" hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7.500 8.500M12 4l4.500 4.500M5 16v2.500A1.500 1.500 0 0 0 6.500 20h11a1.500 1.500 0 0 0 1.500-1.500V16" fill="none" stroke="currentColor" stroke-width="1.600" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span>Drop a <strong>.md</strong> or <strong>.txt</strong> file here, or <u>choose a file</u></span>
+            </label>
+            <div class="samples" id="samples"></div>
+            <label class="field-label" for="input">Book text</label>
+            <textarea id="input" class="field field--sanskrit" lang="sa" rows="12" spellcheck="false" placeholder="…or paste the OCR text here"></textarea>
+            <p class="stats" id="inputStats">No text loaded.</p>
+          </article>
+
+          <article class="card">
+            <p class="eyebrow">Step 2</p>
+            <h3>Your request</h3>
+            <p class="muted">Say what one row should be, which columns you want, and what to leave out.</p>
+            <label class="field-label" for="request">Request</label>
+            <textarea id="request" class="field" rows="9" placeholder="One row per shloka, with the columns: num, shloka, meaning, commentary. Put side headings at the start of the commentary. Remove page headers and footnotes."></textarea>
+
+            <details class="more">
+              <summary>Example rows (optional)</summary>
+              <p class="muted">A few rows of the output you want, as CSV. This helps the agents a lot.</p>
+              <textarea id="examples" class="field field--sanskrit" lang="sa" rows="5" spellcheck="false" placeholder='"num","shloka","commentary"'></textarea>
+              <label class="link-button"><input type="file" id="examplesFile" accept=".csv,text/csv,text/plain" hidden>Load a CSV file</label>
+            </details>
+
+            <div class="field-row field-row--model">
+              <div>
+                <label class="field-label" for="name">Name of this run</label>
+                <input id="name" class="field" type="text" maxlength="80" placeholder="mandala-brahmana">
+              </div>
+              <div>
+                <label class="field-label" for="model">Model</label>
+                <select id="model" class="field"></select>
+              </div>
+            </div>
+            <p class="muted">GPT-5.6 Luna is the only model tested so far. A book of about 30 pages costs roughly 7 cents with it.</p>
+            <label class="check"><input type="checkbox" id="askApproval" checked> Show me the plan before the full run</label>
+
+            <div class="actions">
+              <button class="button button--lg button--primary" id="runButton" type="button">Run extraction</button>
+              <span class="form-error" id="formError" role="alert"></span>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section--plain" id="run" hidden>
+      <div class="container">
+        <p class="eyebrow">In progress</p>
+        <div class="run-head">
+          <h2 id="runTitle">Run</h2>
+          <div class="run-head__side">
+            <span class="status" id="runPhase"></span>
+            <span class="muted" id="runElapsed"></span>
+            <button class="button button--sm button--outline" id="stopButton" type="button" hidden>Stop</button>
+          </div>
+        </div>
+
+        <ol class="stepper" id="stepper">
+          <li data-step="analysing"><span class="stepper__dot">1</span><span><strong>Reading the book</strong><small>The Analyst works out the layout</small></span></li>
+          <li data-step="awaiting_approval"><span class="stepper__dot">2</span><span><strong>Your approval</strong><small>You check the plan</small></span></li>
+          <li data-step="labelling"><span class="stepper__dot">3</span><span><strong>Labelling</strong><small id="chunkProgress">Every line is marked</small></span></li>
+          <li data-step="reviewing"><span class="stepper__dot">4</span><span><strong>Second look</strong><small>The Reviewer checks doubts</small></span></li>
+          <li data-step="done"><span class="stepper__dot">5</span><span><strong>Output ready</strong><small>Rows are assembled</small></span></li>
+        </ol>
+
+        <div class="banner banner--error" id="runError" hidden></div>
+
+        <article class="card proposal" id="proposal" hidden>
+          <p class="eyebrow">The plan needs your approval</p>
+          <h3>What the output will look like</h3>
+          <p id="proposalSummary"></p>
+          <div id="proposalLimits" hidden>
+            <h4>Limitations</h4>
+            <ul id="proposalLimitList"></ul>
+          </div>
+          <h4>Sample rows from a trial</h4>
+          <p class="muted">Rows at the edges of the sample may be incomplete.</p>
+          <div class="table-wrap table-wrap--short"><table class="rows" id="proposalTable"></table></div>
+          <details class="more">
+            <summary>Extraction rules written by the Analyst</summary>
+            <pre class="rules" id="proposalRules"></pre>
+          </details>
+          <label class="field-label" for="feedback">Something to change? Say it here.</label>
+          <textarea id="feedback" class="field" rows="2" placeholder="For example: put the closing line of each section in its own column."></textarea>
+          <div class="actions">
+            <button class="button button--lg button--primary" id="approveButton" type="button">Approve and run</button>
+            <button class="button button--lg button--outline" id="reviseButton" type="button">Send the change</button>
+            <button class="button button--lg button--ghost" id="rejectButton" type="button">Stop this run</button>
+            <span class="form-error" id="decisionError" role="alert"></span>
+          </div>
+        </article>
+
+        <details class="more log">
+          <summary>Activity log</summary>
+          <pre id="log"></pre>
+        </details>
+      </div>
+    </section>
+
+    <section class="section section--dusk" id="output" hidden>
+      <div class="container">
+        <p class="eyebrow">Output</p>
+        <div class="run-head">
+          <h2 id="outputTitle">Output</h2>
+          <div class="run-head__side">
+            <a class="button button--primary" id="downloadCsv" href="#">Download CSV</a>
+            <a class="button button--outline" id="downloadJson" href="#">Download JSON</a>
+          </div>
+        </div>
+
+        <div class="tiles" id="tiles"></div>
+
+        <div class="tabs" role="tablist" aria-label="Output views">
+          <button class="tab" role="tab" data-tab="rows" aria-selected="true" type="button">Rows</button>
+          <button class="tab" role="tab" data-tab="review" aria-selected="false" type="button">To review <span class="count" id="reviewCount"></span></button>
+          <button class="tab" role="tab" data-tab="changes" aria-selected="false" type="button">Text changes <span class="count" id="changeCount"></span></button>
+          <button class="tab" role="tab" data-tab="source" aria-selected="false" type="button">Book text</button>
+          <button class="tab" role="tab" data-tab="request" aria-selected="false" type="button">Request</button>
+          <input class="field search" id="search" type="search" placeholder="Search the rows" aria-label="Search the rows">
+        </div>
+
+        <div class="pane" data-pane="rows">
+          <div class="table-wrap"><table class="rows" id="rowsTable"></table></div>
+          <div class="pane__foot"><span class="muted" id="rowsShown"></span><button class="button button--outline" id="moreRows" type="button" hidden>Show 100 more</button></div>
+        </div>
+        <div class="pane" data-pane="review" hidden><div class="list" id="reviewList"></div></div>
+        <div class="pane" data-pane="changes" hidden>
+          <p class="muted">Every character the code changed while copying. Nothing else in the output differs from the book text.</p>
+          <div class="list" id="changeList"></div>
+        </div>
+        <div class="pane" data-pane="source" hidden><pre class="source" lang="sa" id="sourceText"></pre></div>
+        <div class="pane" data-pane="request" hidden><pre class="source source--plain" id="requestText"></pre></div>
+      </div>
+    </section>
+
+    <section class="section section--dusk" id="how">
+      <div class="container">
+        <p class="eyebrow">How it works</p>
+        <h2>Agents decide what each line is. Code copies the text.</h2>
+        <div class="steps">
+          <article class="step lift"><span class="step__n">1</span><h3>The Analyst reads the book</h3><p>It works out how this book is laid out and proposes a plan. The full run starts only after you approve it.</p></article>
+          <article class="step lift"><span class="step__n">2</span><h3>Labelers mark every line</h3><p>A few pages at a time, each line is marked as root text, commentary, heading or page header. They check their own work.</p></article>
+          <article class="step lift"><span class="step__n">3</span><h3>Code builds the rows</h3><p>The original text is copied into rows and numbered. The AI never writes or corrects a character.</p></article>
+          <article class="step lift"><span class="step__n">4</span><h3>The Reviewer takes a second look</h3><p>Anything uncertain is checked again. What is still in doubt is listed for you.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section--soft" id="runs">
+      <div class="container">
+        <p class="eyebrow">Past runs</p>
+        <h2>Open an earlier run</h2>
+        <p class="muted">Opening a run loads its book text, request and output.</p>
+        <div class="runs" id="runList"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer__row">
+      <span>Veda Script Automation</span>
+      <span class="muted">The AI labels each line. Code copies the text.</span>
+    </div>
+  </footer>
+
+  <script src="/static/app.js" type="module"></script>
+</body>
+</html>

@@ -24,10 +24,14 @@ from agent.orchestrator import RunConfig, run_job
 ROOT = Path(__file__).resolve().parent.parent
 STATIC = Path(__file__).resolve().parent / "static"
 EXAMPLES = ROOT / "examples"
-JOBS = ROOT / "jobs"
+
+# Settings for a hosted copy, all optional. See docs/DOCUMENTATION.md, "Settings".
+JOBS = Path(os.environ.get("JOBS_DIR") or ROOT / "jobs")  # where runs are kept; point it at a persistent disk
 APP_USERNAME = os.environ.get("APP_USERNAME", "veda")
 APP_PASSWORD = os.environ.get("APP_PASSWORD", "")  # when set, every page and API call asks for it
 MAX_ACTIVE_RUNS = int(os.environ.get("MAX_ACTIVE_RUNS", "3"))
+# Render's free plan wipes local files on every restart, so the page warns people to download their output.
+TEMPORARY_STORAGE = bool(os.environ.get("RENDER")) and not os.environ.get("JOBS_DIR")
 JOB_ID = re.compile(r"^\d{8}-\d{6}-[a-z0-9-]+$")
 MAX_INPUT_CHARS = 5_000_000
 
@@ -196,7 +200,8 @@ def _card(job: Job) -> dict:
 def config() -> dict:
     samples = [{"id": d.name, "name": d.name.replace("-", " ").title()} for d in sorted(EXAMPLES.glob("*"))
                if (d / "input.md").exists() and (d / "request.txt").exists()]
-    return {"default_model": DEFAULT_MODEL, "models": MODELS, "key_configured": bool(os.environ.get("OPENROUTER_API_KEY")), "samples": samples}
+    return {"default_model": DEFAULT_MODEL, "models": MODELS, "key_configured": bool(os.environ.get("OPENROUTER_API_KEY")),
+            "samples": samples, "temporary_storage": TEMPORARY_STORAGE}
 
 
 @app.get("/healthz")

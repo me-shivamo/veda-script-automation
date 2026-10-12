@@ -447,6 +447,7 @@ function scrollToCurrent() {
 async function init() {
   const config = await api("/api/config");
   $("keyWarning").hidden = config.key_configured;
+  $("storageNote").hidden = !config.temporary_storage;
   $("model").replaceChildren(...config.models.map((model) =>
     el("option", { value: model.id, text: `${model.label} (${model.note})`, ...(model.id === config.default_model ? { selected: "" } : {}) })));
   $("samples").replaceChildren(...config.samples.map((sample) =>

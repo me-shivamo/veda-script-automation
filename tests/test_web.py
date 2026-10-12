@@ -136,6 +136,11 @@ def test_password_protects_everything_except_the_health_check(client, monkeypatc
     assert "Veda Script Automation" in client.get("/", headers=basic("veda", "open sesame")).text
 
 
+def test_no_password_means_no_prompt_and_health_check_always_answers(client):
+    assert client.get("/healthz").json() == {"ok": True}
+    assert client.get("/api/config").json()["temporary_storage"] is False
+
+
 def test_only_a_few_runs_at_once(client, monkeypatch):
     monkeypatch.setattr(web, "MAX_ACTIVE_RUNS", 1)
     first = start(client)

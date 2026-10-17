@@ -15,3 +15,5 @@ services:
         value: veda
       - key: APP_PASSWORD
         generateValue: true     # Render makes a random password; read or change it under Environment
+      - key: DATABASE_URL
+        sync: false             # a Postgres connection string, so runs survive restarts; see docs/DOCUMENTATION.md

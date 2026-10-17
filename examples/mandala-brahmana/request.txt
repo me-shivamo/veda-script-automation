@@ -12,4 +12,4 @@ Anything else printed with a mantra goes into its bhashya column:
 
 Remove the book title, the page headers with page numbers, the footnotes and the printer's numbers.
 
-Keep the text exactly as printed, including hyphens at line ends. Turn double quotes into single quotes, because the output is a CSV file.
+Keep the text exactly as printed, character for character, including hyphens at line ends and quote marks.

@@ -32,6 +32,8 @@ You are working on OCR text of printed Sanskrit books: Upanishads, the Gita, sut
   2. A group of root texts (say 5 to 10), then their commentaries in the same order. Here each number appears twice: the first time it closes the root text, the second time it closes the commentary on it.
 - One commentary can cover several units. It then ends with a range such as `॥ १२-१३ ॥`.
 - The last commentary of a section sometimes has no number. It runs up to the `इति …` line that closes the section.
+- Books differ in depth. Some have one level of sections, some four (for example काण्ड → अध्याय → ब्राह्मण → कण्डिका). Some parts of a book may skip a level: one ब्राह्मण divided into खण्डs and the next not divided at all.
+- Some editions print the location on every page, in the running header: `अ. ३ खं. २ मं. ४-७` means adhyaya 3, khanda 2, mantras 4 to 7; `सर्गः १२ श्लो. ३०` means sarga 12, shloka 30. Abbreviations vary: अ./अध्या. (अध्याय), खं. (खण्ड), मं. (मन्त्र), श्लो. (श्लोक), ब्रा. (ब्राह्मण), व. (वल्ली), अनु. (अनुवाक), प्र. (प्रपाठक). These headers are the most reliable evidence of where a page is, even though the OCR often garbles them.
 
 ## Page furniture (not book content)
 
@@ -39,6 +41,7 @@ You are working on OCR text of printed Sanskrit books: Upanishads, the Gita, sut
 - **Footnotes.** At the bottom of a page. They give variant readings and name manuscripts by short sigla (`अ`, `अ १`, `क`, `उ`). They start with a small number or mark, and the OCR tool may write them as `[^1]: …`. Example: `1 निद्रासरी—उ.`
   The small marks inside the running text that point to footnotes (`'` or a tiny digit) are part of their line. Leave them alone.
 - **Printer's marks.** A bare number at the bottom of a page (`85`, `36`), unrelated to the text.
+- **Footnotes on the commentary.** Some editions use footnotes to explain the commentary itself rather than to give variant readings: `१ शेषपूरणेन व्याचष्टे …`. These are the editor's notes, so they are book text. Keep them when the user wants them.
 
 ## What OCR does to the page
 
@@ -49,4 +52,6 @@ You are working on OCR text of printed Sanskrit books: Upanishads, the Gita, sut
 - **Blank lines in odd places**, even in the middle of a verse.
 - **A side heading glued into a body line**, or dropped between the two halves of a hyphenated word.
 - **A page or passage that appears twice**, with slightly different errors each time.
+- **Reading order broken by the layout.** When the root text is printed in a box or a separate column, the OCR may give the commentary first and the root text after it, put a section's closing line in the middle of the next section's text, or start the next section's root text before the last commentary of this one. The numbers and the page's location header still tell you where each passage belongs.
+- **Lines in another script** (Tamil, Telugu, Bengali) or of nonsense that the OCR picked up from a stamp, a bleed-through or a neighbouring page.
 - **Spelling errors.** These are everywhere and are never your concern.

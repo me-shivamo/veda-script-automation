@@ -25,7 +25,7 @@ P0232 | ## आसनादिषडङ्गविवरणम्  {md-heading, 
 ## How to work
 
 1. **Read the whole chunk before labelling anything.** Work out where each root text is, where its commentary and meaning are, and which lines are page furniture. Read the Spec's guide for this book: it tells you the order the parts come in.
-2. **Call `label`** with spans that cover every piece, in reading order. A span is a run of consecutive pieces that share the same role and the same `n`. Cover the whole chunk in one call if you can.
+2. **Call `label`** with spans that cover every piece, in reading order. A span is a run of consecutive pieces that share the same role, the same `n` and the same `at`. Cover the whole chunk in one call if you can.
 3. **Call `check`.** Fix every error. An error nearly always means a label is wrong, so look at the pieces again before deciding otherwise. Read each warning and fix the ones that point to a real mistake.
 4. If one piece holds two different things, such as a side heading glued to the start of a sentence, call `split_piece` and then label the two halves.
 5. Call `preview` when you want to see the rows your labels produce. It is the quickest way to confirm that a heading landed on the right unit and that each unit has all its parts.
@@ -40,6 +40,16 @@ P0232 | ## आसनादिषडङ्गविवरणम्  {md-heading, 
 - **A passage with no number of its own** (often the last commentary before a section closes) takes the number of the unit it explains, which is the one just before it.
 - **A chunk that starts mid-passage:** look ahead to the marker where the passage ends. If the passage ends in the context after, use the number you can see there.
 - **A misread number:** give the number the unit should have. See the example below.
+
+## Locators and `at`
+
+- A **locator** line prints where the page is, usually in the running header: `अ. १ खं. ४ मं. १-३` is adhyaya 1, khanda 4, mantras 1–3. Label it with the Spec's locator role and give `at`, the section path it prints, one number per level, outermost first: `at: [1, 4]`. Give `n` too when it prints unit numbers: `n: [1, 3]`.
+- The OCR garbles headers (`[अ. १. श. ३. व. ६]`, or a wrong book title). Give your best reading from the numbers you can see and from the pages around. Code checks locators against each other and ignores one that is out of sequence. If a header line has no location you can read at all, it is a drop role.
+- **When the Spec's position is `printed`**, every numbered span needs `at`: the section path of the passage, from the locator on its page. Then:
+  - Place each passage by what it is, not by what it is printed next to. Root text and commentary that the OCR gives out of order get the `at` and `n` they belong to.
+  - A page where a section ends holds two sections. Passages before the closing line (or explained by commentary numbered for the old section) take the old path; passages of the next section take the next path, for example `[1, 5]` after `[1, 4]`.
+  - Give a section's closing line the `at` of the section it closes, even when the OCR prints it somewhere else on the page. It is then kept with the last passage of that section.
+  - Use 0 for an optional level that this section does not have.
 
 ## Traps
 
@@ -98,6 +108,31 @@ Correct labels, with the reason for each:
 | P0822b | commentary | [48] | Opens with the pratika `योगस्थ इति`. |
 | P0823 | footnote | | A variant reading with the siglum `क`. |
 | P0824 | noise | | A printer's mark. |
+
+## Worked example: a page printed out of order
+
+An invented page of a Spec with position `printed`, levels `adhyaya` and `khanda`, and the roles `mula`, `bhashya`, `header` (locator) and `khanda_end`:
+
+```
+--- page 30 ---
+P0601 | त्रीणि पदानि व्याख्यायन्ते । तदिति ॥२॥  {n=2}
+P0602 | प्रथमं पदं व्याचष्टे—अथेति ॥१॥  {n=1}
+P0603 | अथ यदिदं पुरुषं वेद ॥१॥  {n=1}
+P0604 | अ. २ खं. ३ मं. १-२] भाष्यसमेता ।
+P0605 | तदेतत्सत्यं य एवं वेद ॥२॥  {n=2}
+P0606 | इति द्वितीयाध्याये तृतीयः खण्डः ।
+P0607 | स य इच्छेदिति होवाच ॥१॥  {n=1}
+```
+
+| pieces | role | n | at | why |
+|---|---|---|---|---|
+| P0601 | bhashya | [2] | [2, 3] | Commentary on mantra 2, printed before the commentary on 1. |
+| P0602 | bhashya | [1] | [2, 3] | Commentary on mantra 1: the pratika `अथेति` quotes P0603. |
+| P0603 | mula | [1] | [2, 3] | |
+| P0604 | header | [1, 2] | [2, 3] | The locator: adhyaya 2, khanda 3, mantras 1–2. |
+| P0605 | mula | [2] | [2, 3] | |
+| P0606 | khanda_end | | [2, 3] | It closes khanda 3. |
+| P0607 | mula | [1] | [2, 4] | After the close, the first mantra of the next khanda. |
 
 ## Finishing
 

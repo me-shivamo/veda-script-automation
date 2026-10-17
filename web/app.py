@@ -21,6 +21,7 @@ from agent.agents.models import DEFAULT_MODEL, ModelConfig
 from agent.core.spec import render_spec
 from agent.jobs import Job
 from agent.orchestrator import RunConfig, run_job
+from web.store import Store
 
 ROOT = Path(__file__).resolve().parent.parent
 STATIC = Path(__file__).resolve().parent / "static"
@@ -31,17 +32,20 @@ JOBS = Path(os.environ.get("JOBS_DIR") or ROOT / "jobs")  # where runs are kept;
 APP_USERNAME = os.environ.get("APP_USERNAME", "veda")
 APP_PASSWORD = os.environ.get("APP_PASSWORD", "")  # when set, every page and API call asks for it
 MAX_ACTIVE_RUNS = int(os.environ.get("MAX_ACTIVE_RUNS", "3"))
-# Render's free plan wipes local files on every restart, so the page warns people to download their output.
-TEMPORARY_STORAGE = bool(os.environ.get("RENDER")) and not os.environ.get("JOBS_DIR")
+# A Postgres database that keeps a copy of every run, for a host that wipes its files (see web/store.py).
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+STORE = Store(DATABASE_URL, JOBS) if DATABASE_URL else None
+# Render's free plan wipes local files on every restart, so without a disk or a database the page warns people.
+TEMPORARY_STORAGE = bool(os.environ.get("RENDER")) and not os.environ.get("JOBS_DIR") and not DATABASE_URL
 JOB_ID = re.compile(r"^\d{8}-\d{6}-[a-z0-9-]+$")
 MAX_INPUT_CHARS = 5_000_000
 
 # The default comes first. Only the first two have been tested on real books so far.
 MODELS = [
+    {"id": "openai/gpt-6-luna", "label": "GPT-6 Luna", "note": "tested"},
     {"id": "openai/gpt-5.6-luna", "label": "GPT-5.6 Luna", "note": "tested"},
     {"id": "anthropic/claude-haiku-5.5", "label": "Claude Haiku 5.5", "note": "untested"},
     {"id": "google/gemini-3.8-flash", "label": "Gemini 3.8 Flash", "note": "untested"},
-    {"id": "openai/gpt-6-luna", "label": "GPT-6 Luna", "note": "tested"},
     {"id": "anthropic/claude-sonnet-5.5", "label": "Claude Sonnet 5.5", "note": "untested, costs more"},
     {"id": "openai/gpt-5.6-sol", "label": "GPT-5.6 Sol", "note": "untested, costs more"},
 ]
@@ -72,6 +76,8 @@ RUNS: dict[str, Run] = {}
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     JOBS.mkdir(parents=True, exist_ok=True)
+    if STORE:
+        await asyncio.to_thread(STORE.start)  # a wrong DATABASE_URL stops the server here, where the host's log shows it
     yield
     # On shutdown, stop the runs still in progress so each one records that it was stopped.
     tasks = [run.task for run in RUNS.values() if run.task and not run.task.done()]
@@ -128,7 +134,11 @@ class Decision(BaseModel):
 
 
 def _job(job_id: str) -> Job:
-    if not JOB_ID.match(job_id) or not (JOBS / job_id).is_dir():
+    if not JOB_ID.match(job_id):
+        raise HTTPException(404, "There is no run with that ID.")
+    if STORE:
+        STORE.fetch(job_id)
+    if not (JOBS / job_id).is_dir():
         raise HTTPException(404, "There is no run with that ID.")
     return Job(JOBS / job_id)
 
@@ -144,6 +154,16 @@ def _explain(error: Exception) -> str:
     if isinstance(error, AgentRunError):
         return f"An agent could not finish its work: {text[:300]}"
     return f"{type(error).__name__}: {text[:300]}"
+
+
+async def _keep(run: Run) -> None:
+    """Copy the run's folder to the database, if there is one. A failure is shown on the page instead of ending the run."""
+    if STORE is None:
+        return
+    try:
+        await asyncio.to_thread(STORE.save, run.job.dir)
+    except Exception as error:  # a database problem must not lose the run itself
+        run.log.append(f"Could not save this run to the database, so a server restart will lose it. {type(error).__name__}: {str(error)[:300]}")
 
 
 async def _drive(run: Run, config: RunConfig) -> None:
@@ -169,6 +189,7 @@ async def _drive(run: Run, config: RunConfig) -> None:
             run.decision, run.proposal = None, None
 
     try:
+        await _keep(run)  # the input is saved first, so a run cut off by a crash still shows what was sent
         summary = await run_job(run.job, config, approve=approve, say=run.log.append, on_event=on_event)
         run.phase = STATE_TO_PHASE[summary["state"]]
     except asyncio.CancelledError:
@@ -178,6 +199,8 @@ async def _drive(run: Run, config: RunConfig) -> None:
     except Exception as error:  # report every failure to the page instead of losing it in the server log
         run.phase, run.error = "failed", _explain(error)
         run.job.save_json("state.json", {"state": "FAILED", "error": run.error})
+    finally:
+        await _keep(run)  # also when the server is shutting down: it cancels the run, and the run is kept as stopped
 
 
 def _meta(job: Job) -> dict:

@@ -274,8 +274,9 @@ def config() -> dict:
 
 @app.get("/healthz")
 def health() -> dict:
-    """For the host's health check. Never asks for a password."""
-    return {"ok": True}
+    """For the host's health check. Never asks for a password. Names the deployed commit (Render sets RENDER_GIT_COMMIT)."""
+    commit = os.environ.get("RENDER_GIT_COMMIT", "")[:7]
+    return {"ok": True, "commit": commit} if commit else {"ok": True}
 
 
 @app.get("/api/samples/{sample_id}")

@@ -165,14 +165,18 @@ def test_password_protects_everything_except_the_health_check(client, monkeypatc
         assert response.status_code == 401 and response.headers["www-authenticate"].startswith("Basic"), path
     assert client.post("/api/runs", json={"input": "x", "request": "x"}).status_code == 401
     assert client.get("/healthz").json() == {"ok": True}
+    monkeypatch.setenv("RENDER_GIT_COMMIT", "0123456789abcdef")
+    assert client.get("/healthz").json() == {"ok": True, "commit": "0123456"}
     for wrong in (basic("veda", "wrong"), basic("someone", "open sesame"), {"Authorization": "Basic not-base64!"}, {"Authorization": "Bearer open sesame"}):
         assert client.get("/api/config", headers=wrong).status_code == 401
     assert client.get("/api/config", headers=basic("veda", "open sesame")).status_code == 200
     assert "Veda Script Automation" in client.get("/", headers=basic("veda", "open sesame")).text
 
 
-def test_no_password_means_no_prompt_and_health_check_always_answers(client):
+def test_no_password_means_no_prompt_and_health_check_always_answers(client, monkeypatch):
     assert client.get("/healthz").json() == {"ok": True}
+    monkeypatch.setenv("RENDER_GIT_COMMIT", "0123456789abcdef")
+    assert client.get("/healthz").json() == {"ok": True, "commit": "0123456"}
     assert client.get("/api/config").json()["temporary_storage"] is False
 
 

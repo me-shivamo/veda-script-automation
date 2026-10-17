@@ -6,10 +6,11 @@ import shutil
 import sys
 from pathlib import Path
 
-from .agents.analyst import AnalystResult, describe
+from .agents.analyst import AnalystResult
 from .agents.models import DEFAULT_MODEL, ModelConfig
 from .jobs import JOBS_DIR, Job
 from .orchestrator import RunConfig, run_job
+from .plan import describe_plan
 
 
 def _text_or_file(value: str) -> str:
@@ -17,8 +18,8 @@ def _text_or_file(value: str) -> str:
     return path.read_text(encoding="utf-8") if len(value) < 300 and path.is_file() else value
 
 
-async def _ask_user(result: AnalystResult) -> bool | str:
-    print("\n" + "=" * 78 + "\n" + describe(result) + "\n" + "=" * 78)
+async def _ask_user(result: AnalystResult, view: dict) -> bool | str:
+    print("\n" + "=" * 78 + "\n" + describe_plan(view) + "\n" + "=" * 78)
     answer = (await asyncio.to_thread(input, "\nApprove? [y] yes  [n] stop  or type what to change: ")).strip()
     if answer.lower() in ("y", "yes", ""):
         return True

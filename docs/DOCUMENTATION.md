@@ -25,19 +25,31 @@ This guide covers how the tool works, how to use it, how to deploy it on Render,
 
 Printed Sanskrit books are scanned and run through OCR. The OCR text has everything mixed together: the root text, the commentary, side headings, page headers, footnotes and stray marks.
 
-This tool turns that text into a clean table with **one row per shloka** (or mantra, or sutra). Each row holds the root text and whatever is printed with it: commentary, meaning, headings.
+This tool turns that text into structured output with **one entry per shloka** (or mantra, or sutra). Each entry holds the root text and whatever is printed with it: commentary, meaning, notes on the commentary, headings.
+
+No two books are laid out alike, so nothing about the structure is fixed. The AI works out each book's own structure: how many levels of sections it has (अध्याय → खण्ड → मन्त्र, or four or five levels), whether some sections skip a level, which kinds of text belong to each unit and which text comments on which. You see what it understood before anything is extracted.
 
 You tell it in plain words what you want. For example:
 
 > One row per mantra, with the columns num, upanishad and bhashya. Put side headings at the start of the bhashya. Remove page headers and footnotes.
 
-The output is a CSV or JSON file, plus a short list of places a person should check.
+The output comes in three shapes, and every run writes all three:
+
+| Shape | What it looks like | Good for |
+|---|---|---|
+| Table | One row per unit, one column per kind of text. The ID is `1.3.5`, or one column per level. | A spreadsheet. |
+| Blocks | One row per piece of text: its place in the book, its layer (mantra, bhashya, …) and the text. | Books with many layers of text. |
+| Tree | Nested JSON in the book's own shape: adhyayas holding khandas holding mantras. | Programs, and books with deep or uneven structure. |
+
+You say which shape you want, or let the AI choose from your request. A short list of places a person should check comes with every run.
 
 ### The one rule it never breaks
 
 **The AI never writes any of the output text.** It only decides what each line of the book is. Code then copies the original text into the right place. So the output cannot contain invented text, a translation the book does not print, or a "corrected" spelling.
 
-The few characters the code does change, such as a misread verse number, are all listed for you.
+Code does not change a single character either. Quotes, hyphens, stray marks and even a verse number the OCR misread stay exactly as in the text you loaded. The only thing left out of a line is the `##` mark the OCR tool puts in front of headings, which is not printed in the book. Lines removed as page headers or footnotes are all listed for you.
+
+At the end of every run, a separate code check proves this: every output cell must be its lines' text joined by spaces, and every line of the input must be either in the output or on the list of removed lines. A run that fails this check cannot end as **Done**.
 
 ---
 
@@ -52,11 +64,20 @@ OCR text ──► pieces ──► Analyst ──► you approve ──► Labe
 
 1. **Code cuts the book into small numbered pieces.** One piece is one printed line. A line is cut again after every verse number, so two shlokas on one line become two pieces.
 
-2. **The Analyst reads the book and writes a plan.** The plan says which columns the output has, which kinds of line this book contains, how its sections are numbered, and how to tell the kinds of line apart. The Analyst tries the plan on a few pages and shows you sample rows. Nothing else happens until you approve.
+2. **The Analyst reads the book and writes a plan.** It works out the structure first (the levels of sections, the unit, every kind of text and which text comments on which, and whether the OCR reading order can be trusted), then the columns. It tries the plan on a few pages. You are shown:
+   - **what it found**: the levels, an outline of the sections with the lines that show each one, and each kind of text with a real example and where it goes;
+   - **your output file**: the shape and columns, with the trial pages written out by the same code that writes the final file;
+   - **its questions**: decisions it could not make alone, for you to answer.
+
+   Nothing else happens until you approve. You can correct the plan in your own words, answer the questions, or change the columns and shape yourself (see [Step 3](#step-3-the-plan)).
 
 3. **Labelers mark every piece.** The book is split into parts of about six pages, and several parts are worked on at once. A Labeler gives each piece a label, such as "root text of mantra 5", "commentary on mantra 5", "side heading" or "page header". It then runs the checks on its own work, and it is not allowed to finish while a check fails.
 
-4. **Code builds the rows.** It copies the text of the pieces into rows, in reading order. It works out the row numbers itself by counting section endings (`इति प्रथमः खण्डः`), so one wrong label cannot shift the numbering of the rest of the book.
+4. **Code builds the rows.** It copies the text of the pieces into rows. Where each row sits in the book is decided in one of two ways, chosen by the Analyst:
+   - **Counted** (the usual way): code counts the lines that open and close sections (`इति प्रथमः खण्डः`) in reading order, so one wrong label cannot shift the numbering of the rest of the book.
+   - **Printed**: some editions print the location on every page (`अ. १ खं. ४ मं. १-३`), and some OCR scrambles the order of a page (a boxed mantra read after its own commentary). There the Labelers give each passage the location printed on its page, and code places it there, whatever order the OCR gave.
+
+   In both ways, the running headers that print a location are used to check every row's place, and an extract that starts in the middle of a book (say at खण्ड ३) is numbered from where it starts.
 
 5. **Code checks the whole book.** See [the checks](#the-checks) below.
 
@@ -80,9 +101,13 @@ After labelling, code checks that:
 - verse numbers run in order inside each section, with no gaps
 - each passage ends at its own verse number, and no text after a number is given that same number
 - every row has the columns the plan says it must have
-- nothing that looks like book text was thrown away as a page header or footnote
+- nothing that looks like book text was thrown away as a page header or footnote (an agent cannot excuse this with a flag; the text must be kept)
 - nothing that looks like a page header or footnote was kept as book text
 - a line labelled as a heading does not read like a sentence or verse
+- the output keeps reading order: nothing printed after a heading or after a section's closing line is moved back into the unit before it
+- every row's place agrees with the location printed in the page headers, where the book prints one (this catches a misread closing line, such as `…षष्ठोऽध्यायः` printed where a khanda ends)
+- a column does not end in a broken word (`…तत्प्रवि-`), which would mean its last words were put somewhere else
+- in a book read in order, a unit's commentary does not come before its own root text
 
 A Labeler has to fix a failed check, or flag the pieces with a reason. Flagged pieces go to the Reviewer, and then to you if they are still in doubt.
 
@@ -120,72 +145,75 @@ To try it without your own book, click **Use the sample book** on the page.
 
 ## 4. Using the web page
 
+The page has three places, linked from the dark bar at the top:
+
+| Place | What it is |
+|---|---|
+| **Runs** | Every run, newest first, with its state, rows and cost. Click one to open it. |
+| **New extraction** | Two steps: the book, then your request. |
+| A run's page | Follows one run from start to finish: the plan, the progress, and the output. |
+
+The **?** button explains how it works. Every run has its own address (`…/#/runs/<id>`), so you can bookmark it, share it with someone who can reach the same server, or reload the page without losing your place. `…/#/runs/<id>/review` opens it on the review list.
+
 ### Step 1: the book
 
-![Loading a book and writing the request](images/workspace.jpg)
+![Loading the book](images/workspace.jpg)
 
-Drop a `.md` or `.txt` file onto the box, click **choose a file**, or paste the text into the box. The line under the box shows how many pages, lines and characters were loaded.
+Drop a `.md` or `.txt` file onto the box, click **choose a file**, or paste the text. The line under the box shows how many pages, lines and characters were loaded. Click **Next: your request**.
 
 ### Step 2: your request
 
-Write what you want in the **Request** box. [Section 5](#5-preparing-the-book-and-writing-the-request) explains how to write a good one.
+Write what you want in the **Request** box, in Hindi or English. [Section 5](#5-preparing-the-book-and-writing-the-request) explains how to write a good one.
 
 The other fields:
 
 - **Example rows (optional).** A few rows of the output you want, as CSV. This is the most useful thing you can give the agents.
-- **Name of this run.** How the run appears in the list of past runs, and the name of the downloaded file.
-- **Model.** Which AI model to use. GPT-6 Luna is the default. It and GPT-5.6 Luna are the two tested models.
+- **The output file (optional).** The shape (table, blocks or tree), the row ID (`1.3.5` or a column per level), where section titles and closing lines go, and the columns in order. Leave any of these to the AI; you can also change them on the plan.
+- **Name of this run.** How the run appears in the list, and the name of the downloaded files.
+- **Model.** GPT-6 Luna is the default. It and GPT-5.6 Luna are the two tested models.
 - **Show me the plan before the full run.** Leave this ticked unless you have already run the same kind of book and trust the result.
 
-Click **Run extraction**.
+**Back** returns to the book without losing anything. Click **Read the book and show me the plan**.
 
-### Step 3: progress and the plan
+### Step 3: the plan
 
-The page shows five stages:
+The run's page shows its stages along the top: book and request, the plan, labelling, second look, output. While the Analyst reads the book (one to three minutes) the page says what it is doing.
 
-| Stage | What is happening |
-|---|---|
-| Reading the book | The Analyst is working out the layout. About a minute. |
-| Your approval | The plan is ready and waiting for you. |
-| Labelling | Labelers are marking every line. The page shows how many parts are done. |
-| Second look | The Reviewer is checking doubts. |
-| Output ready | The rows are built. |
-
-When the plan is ready, it appears on the page:
+When the plan is ready:
 
 ![The plan, waiting for approval](images/plan.jpg)
 
-Read the description and look at the sample rows. Then choose one:
+| Part | What it shows |
+|---|---|
+| **What I found in this book** | In plain words, what each row will hold. The structure as a chain (adhyaya → khanda → mantra) and the kinds of text each unit holds, with notes on which text comments on which. How rows are placed and numbered. An outline of the sections, each with the printed lines that show it. |
+| **Each kind of text, and where it goes** | Every kind of line the book has, a real example from the book, and the column it goes to, or that it is left out. |
+| **Your output file** | The shape, the row ID and the columns, and a preview: the trial pages written exactly as the file will be. |
+| **Questions for you** | What the Analyst could not decide alone. **Yes** and **No** fill in the answer; you can also write one. |
+| **Limitations** | What the book cannot provide, and oddities to know about. |
 
-- **Approve and run** if the sample rows look right.
-- **Send the change** after typing what should be different, for example "put the closing line of each section in its own column". The Analyst revises the plan and shows it again.
-- **Stop this run** to cancel.
+Then, in the bar at the bottom:
 
-Rows at the edges of the sample can be incomplete, because the sample is cut from the middle of the book. That is normal.
+- **Approve and run** starts the full run.
+- **Change the output file yourself.** Switch the shape or row ID, and use the buttons on each column to move it (‹ ›), rename it (✎) or put its text into another column (⤵). **Apply** makes these changes straight away, by code, without the AI.
+- **Send to the Analyst.** Write a correction ("footnotes on the bhashya go in their own column") and/or answer its questions. The Analyst changes the plan, tries it again, and shows it once more. The page shows what you asked while it works.
+
+Each new version of the plan starts with **What changed in version N**, so you can see your correction was taken up. **Stop** cancels the run.
 
 ### Step 4: the output
 
 ![The output](images/output.jpg)
 
-The boxes at the top show the number of rows, how many items need review, how many characters the code changed, the time taken and the cost.
+The boxes at the top show the number of rows, how many items need review, how many lines were left out, the time taken and the cost.
 
 | Tab | What it shows |
 |---|---|
-| Rows | The table. Click a row to open it fully. Use the search box to find text. A gold dot marks a row with something to review. |
+| Output | The output, shown as a table, as blocks or as a tree (switch with **Show as**). Click a row to open it fully. Use the search box to find text. A gold dot marks a row with something to review. Section titles and closing lines kept apart from the units show as grey rows. |
 | To review | The places a person should check. Click a row number to jump to that row. |
-| Text changes | Every character the code changed while copying. |
-| Book text | The text you loaded. |
-| Request | The request you wrote. |
+| Lines left out | Every line removed from the output (page headers, footnotes, printer's marks), with its page. |
+| Plan used | The plan that was approved. |
+| Book text, Request | What you gave. |
 
-**Download CSV** and **Download JSON** save the rows to your computer.
-
-### Past runs
-
-The bottom of the page lists earlier runs. Clicking one loads its book text, request and output back into the page.
-
-To share a run with someone who can reach the same server, copy the address from the browser. It looks like `…/?run=20261012-103428-my-book`. Adding `&tab=review` opens it on the review list.
-
----
+The orange button downloads the shape you chose. **Other formats** has the other shapes and a JSON file that names the book lines behind every cell.
 
 ## 5. Preparing the book and writing the request
 
@@ -205,10 +233,7 @@ A good request answers four questions.
 3. **Where does the extra text go?** "Side headings go at the start of the bhashya of the mantra that follows. Closing lines such as इति प्रथमः खण्डः go at the end of the bhashya before them."
 4. **What should be removed?** "Remove the book title, page headers, footnotes and printer's numbers."
 
-Also say how you want the text itself treated, if you care:
-
-- "Keep hyphens at line ends" or "join words that were split across lines".
-- "Turn double quotes into single quotes."
+The text itself is always copied exactly as printed, so there is nothing to say about quotes, hyphens or spelling.
 
 The request for the sample book is in [examples/mandala-brahmana/request.txt](../examples/mandala-brahmana/request.txt). Use it as a pattern.
 
@@ -230,10 +255,11 @@ No run should be trusted blindly. The tool tells you where to look.
 
 | Label | What it means | What to do |
 |---|---|---|
-| Verse number corrected | The OCR text has a verse number that breaks the sequence, such as ९ where ५ belongs. The number in the output was corrected. | Check the printed page and confirm. |
+| Printed number differs | The OCR text has a verse number that breaks the sequence, such as ९ where ५ belongs. The row is placed as ५, but its text keeps the ९ exactly as in the OCR. | Check the printed page and correct the downloaded file if needed. |
 | Flagged by an agent | An agent was unsure about a line and explains why. | Read the reason and check that row. |
 | Missing part | A row lacks a column it should have, for example a mantra with no commentary. | Check whether the book really has none. |
-| Possibly dropped text | A line was removed as a page header or footnote but looks like book text. | Check that nothing real was lost. |
+| Possibly dropped text | A line was removed as a page header or footnote but looks like book text. | Check that nothing real was lost. This is always an error. |
+| Not an exact copy | The output differs from the book text. This should never happen; it means a fault in the code. | Do not use the output. Report the run. |
 | Possible page header in text | A line kept in a row looks like a page header or footnote. | Check that row, usually where a passage crosses a page. |
 | Possible heading mistake | A line was treated as a heading but reads like a sentence. | Check the start of that row. |
 | Numbering doubt, Number missing, Numbers out of order | The verse numbers do not run in order here. | Check for a verse missing from the OCR. |
@@ -242,27 +268,20 @@ No run should be trusted blindly. The tool tells you where to look.
 
 A run that ends as **Done** has no errors left. A run that ends as **Done, with items to review** still has unresolved errors, so check its list with extra care.
 
-### The "Text changes" list
+### The "Lines left out" list
 
-| Label | What changed |
-|---|---|
-| Verse number fixed | A misread digit in a verse number was replaced with the right one. |
-| Quotes changed | Double quotes became single quotes, if you asked for that. |
-| Stray mark removed | A bullet or dot the OCR added at the start of a line was removed. |
-| Hyphen joined | A word split across two lines was joined, if you asked for that. |
+Every line that is not in the output, with its page and the reason (for example `page header`, `footnote`). Read through it once to confirm that nothing real was removed.
 
-The `##` marks that the OCR tool adds in front of headings are also removed. They are the OCR tool's own markup, not part of the book, so they are not listed.
-
-Apart from these, every character in the output is exactly as in the text you loaded.
+Apart from these lines, every character in the output is exactly as in the text you loaded. Lines are joined with a single space, and the `##` marks the OCR tool adds in front of headings are left out because they are not printed in the book.
 
 ### How reliable is it?
 
-The tool has been measured on one book, the Mandala Brahmana Upanishad sample (28 pages, 89 mantras), with the GPT-6 Luna and GPT-5.6 Luna models:
+The tool has been measured on two books with the GPT-6 Luna model:
 
-- In the most recent runs (two with each model), all 50 rows that have an expected answer matched exactly, and 87 of the 89 rows came out the same in every run. The other two differed only in a leading dash and in whether the closing colophon of the book was kept.
-- Earlier runs, before some of the checks existed, were wrong on up to 8 of the 89 rows.
+- **The Mandala Brahmana Upanishad sample** (28 pages, 89 mantras, page headers that name the section). Runs since 12 October have matched all 50 rows that have an expected answer exactly, except for a few rows in individual runs, each of which led to a new check. The latest run, on 17 October with the code described here, matched 50 of 50.
+- **24 pages of the Chandogya Upanishad** with its commentary and the editor's footnotes (adhyaya → khanda → mantra, a location header on every page, and OCR that prints the boxed mantras out of order). Before the changes of 17 October, every row was numbered two khandas too low and five mantras lost their root text. Now all 46 mantras are placed 1.3.3 to 1.9.1, each with its root text, in about 6 minutes for 6 to 8 cents. The review list points to the places where the OCR itself is broken.
 
-Results vary a little between runs, and a different book may bring problems this one did not. Treat the review list as part of the work, not as an optional extra.
+Results vary a little between runs, and a different book may bring problems these did not. Treat the review list as part of the work, not as an optional extra.
 
 ---
 
@@ -454,10 +473,13 @@ Each run gets its own folder under `jobs/`, named with the date, time and run na
 
 | File | Contents |
 |---|---|
-| `output.csv`, `output.json` | The rows. |
+| `output.csv` | The table. |
+| `output_blocks.csv`, `output_tree.json` | The same output as blocks and as a tree. |
+| `output.json`, `sections.json` | The rows (and any section text kept apart) with the IDs of the lines behind every cell. |
+| `plan_1.json`, `plan_2.json`, … `plan.json` | Every version of the plan you were shown, and the one you approved. |
 | `issues.json` | The review list. |
-| `changes.json` | Every character the code changed. |
-| `analyst.md` | The plan as shown to you. |
+| `removed.json` | Every line left out of the output, with its page and role. |
+| `analyst.md` | The latest plan as text. |
 | `spec.json` | The plan as data. Pass it to `--spec` to reuse it. |
 | `input.md`, `request.txt`, `examples.csv` | What you gave. |
 | `pieces.json`, `labels.json` | The numbered pieces of the book and the label on each. |
@@ -530,7 +552,8 @@ agent/
   core/              No AI in here
     pieces.py          Cut text into numbered pieces
     duplicates.py      Find pages the OCR produced twice
-    spec.py            The plan (the "Spec"): columns, roles, numbering, text options
+    spec.py            The "Spec": levels, columns, roles, how rows are placed, output shape; edits made by code
+    fidelity.py        The proof that every output character is the book's own
     labels.py          Labels on pieces; flags
     assemble.py        Build rows from labelled pieces; all the checks
     view.py            Text views of pieces, rows and issues for the agents
@@ -541,12 +564,14 @@ agent/
     models.py          Which model each agent uses, through OpenRouter
   orchestrator.py    Runs one book from start to finish
   jobs.py            One folder per run
-  export.py          CSV and JSON writers
+  plan.py            The plan screen's data: outline, kinds of text, previews in every shape, what changed
+  export.py          Table, blocks and tree writers
   __main__.py        Command line
 web/
   app.py             FastAPI server
   __main__.py        python -m web
-  static/            index.html, app.css, app.js, img/
+  static/            index.html, app.css, img/, and one script per screen:
+                     app.js (routes), runs.js, newrun.js, run.js, plan.js, output.js, ui.js
 eval/
   score.py           Compare an output with a book's expected rows
   bakeoff.py         Run and score one or more models, several times if asked
@@ -563,10 +588,14 @@ The agents are built with [Pydantic AI](https://ai.pydantic.dev). The web page i
   - `unit`: numbered content, such as root text or commentary. The Labeler gives its number.
   - `attach_next`: unnumbered text kept with the unit that follows, such as a side heading.
   - `attach_prev`: unnumbered text kept with the unit before it, such as a closing line.
+  - `locator`: a line that prints where the page is (a running header). The Labeler gives the path it prints (`at`). Left out of the output; used to check every row's place and to number an extract from where it starts.
   - `drop`: page furniture, removed from the output.
-- A role can also mark where a numbering level starts or ends. Code counts these to build row IDs.
+- A role can also mark where a numbering level starts or ends. In a `counted` book, code counts these to build row IDs. In a `printed` book the Labeler gives every numbered span its section path (`at`).
+- Levels are objects: a level can be `optional` (some sections skip it, so units are numbered one level up, `4.1`), and can have `fields` of its own, for text kept per section (a role then targets `khanda.closing`).
+- A field can be `about` another field, for text that comments on the commentary.
 - Labelers write `Label`s into a `LabelStore`.
-- `build()` in `assemble.py` walks the pieces in order and produces the rows, the issues and the change log.
+- `build()` in `assemble.py` walks the pieces and produces the rows, the section records and the issues. `export.py` writes them as a table, blocks or a tree.
+- The Analyst's `submit` returns the Spec with an outline (with evidence piece IDs, checked by code), questions and limitations. `plan.py` turns these and the trial labels into the plan screen. Edits the user makes to the output structure are applied by `apply_structure_edits()` in `spec.py` without an agent.
 
 ### Tests
 
@@ -574,7 +603,8 @@ The agents are built with [Pydantic AI](https://ai.pydantic.dev). The web page i
 uv run pytest
 ```
 
-- `test_core.py` tests the text handling with hand-written labels. One test labels the first three pages of the sample book by hand and checks the rows against the expected output.
+- `test_core.py` tests the text handling with hand-written labels.
+- `test_structure.py` tests books of other shapes: page locators, out-of-order OCR, optional levels, section text, five levels, and the edits made on the plan. One test labels the first three pages of the sample book by hand and checks the rows against the expected output.
 - `test_agents_offline.py` and `test_web.py` drive the agents and the web server with a scripted stand-in for the model. They make no API calls.
 - `test_store.py` checks that runs come back from the database after the files are wiped. It needs a Postgres database it may empty: `TEST_DATABASE_URL=postgresql://... uv run pytest`. Without one, those tests are skipped.
 
@@ -618,13 +648,14 @@ Edit the `MODELS` list in `web/app.py`. Any OpenRouter model that supports tool 
 | `GET /api/config` | Models, sample books, whether the key is set. |
 | `GET /api/samples/{id}` | A sample book's text, request and example rows. |
 | `GET /api/runs` | The most recent runs. |
-| `POST /api/runs` | Start a run. Body: `name`, `input`, `request`, `examples`, `model`, `ask_approval`. |
+| `POST /api/runs` | Start a run. Body: `name`, `input`, `request`, `examples`, `model`, `ask_approval`, and optionally `output` (`shape`, `id_style`, `section_text`, `columns`). |
 | `GET /api/runs/{id}` | Progress, the plan when one is waiting, any error. |
-| `POST /api/runs/{id}/decision` | Answer the plan. Body: `action` (`approve`, `revise` or `stop`) and `feedback`. |
+| `POST /api/runs/{id}/decision` | Answer the plan. Body: `action` (`approve`, `revise`, `edit` or `stop`), `feedback`, `answers` (question → answer) and `edits` (changes to the output structure, made by code). |
+| `GET /api/runs/{id}/plans` | Every version of the plan the run was shown. |
 | `POST /api/runs/{id}/stop` | Stop a run in progress. |
 | `GET /api/runs/{id}/input` | The book text, request and example rows of a run. |
-| `GET /api/runs/{id}/result` | Rows, review list, text changes, summary. |
-| `GET /api/runs/{id}/download/csv` or `/json` | The output file. |
+| `GET /api/runs/{id}/result` | Rows, section text, the tree, review list, lines left out, the approved plan, summary. |
+| `GET /api/runs/{id}/download/{csv,blocks,tree,json}` | An output file. |
 
 Limits: book text up to 5,000,000 characters, request up to 20,000, example rows up to 200,000.
 
@@ -634,7 +665,8 @@ Limits: book text up to 5,000,000 characters, request up to 20,000, example rows
 
 **Limits today**
 
-- **One book, one model.** All measurements are from the sample book with GPT-6 Luna and GPT-5.6 Luna.
+- **Two books, one model.** Measured on the Mandala Brahmana sample and 24 pages of the Chandogya Upanishad (three levels, page locators, scrambled OCR order), with GPT-6 Luna. Four- and five-level books are covered only by code tests until a real one is tried.
+- **Text the OCR scrambled inside one unit is not reordered.** If the second half of a mantra is read before its first half, code keeps the OCR order and lists it for review: code never moves text.
 - **Numbered units only.** Each shloka, mantra or sutra must end with its printed number. Books of unnumbered prose with side notes are not supported.
 - **No fixing in the page.** You correct the downloaded file by hand.
 - **Footnotes are all-or-nothing.** They can be kept or dropped, but are not linked to the word they annotate.

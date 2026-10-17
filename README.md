@@ -2,7 +2,7 @@
 
 Turns the OCR text of a scanned Sanskrit book into one row per shloka (or mantra, or sutra), with its commentary, meaning and anything else printed with it.
 
-You load the book text, say in plain words what you want, and get a table you can download as CSV or JSON.
+You load the book text and say in plain words what you want. The AI works out the book's own structure (any number of section levels, and every kind of text printed with each unit) and shows you its plan, including the output file as it will look, before anything is extracted. You get a table, a list of text blocks, or a nested tree, as CSV or JSON.
 
 ![The home page](docs/images/home.jpg)
 
@@ -25,20 +25,20 @@ Full documentation: **[docs/DOCUMENTATION.md](docs/DOCUMENTATION.md)**
 
 1. **You load a book.** OCR text, with pages separated by lines of `---`.
 2. **You write a request.** For example: "One row per mantra with the columns num, upanishad, bhashya. Put side headings at the start of the bhashya. Remove page headers and footnotes."
-3. **The Analyst agent reads the book and shows you a plan**, with sample rows. You approve it, ask for a change, or stop.
+3. **The Analyst agent reads the book and shows you a plan**: the structure it found (for example adhyaya → khanda → mantra, with the printed lines that show each section), each kind of text and where it goes, the output file as it will look, and its questions for you. You approve it, correct it in your own words, change the columns and shape yourself, or stop.
 4. **Labeler agents mark every line**, a few pages at a time. They check their own work and cannot finish while a check fails.
-5. **Code builds the rows** and numbers them (`1.2.5`), then checks the whole book.
+5. **Code builds the output** and numbers it (`1.2.5`), by counting the book's section lines, or by the location printed on each page when the OCR order cannot be trusted. Then it checks the whole book.
 6. **The Reviewer agent takes a second look** at anything doubtful. What is still in doubt is listed for you.
 
 ![The output table](docs/images/output.jpg)
 
 You get:
 
-- the rows, as a searchable table and as CSV / JSON files
+- the output as a table, as blocks (one row per piece of text) and as a tree, to read in the page or download
 - a **To review** list: the few places a person should check
-- a **Text changes** list: every character the code changed while copying (for example a misread verse number, or quote marks)
+- a **Lines left out** list: every line removed from the output, such as page headers and footnotes. Everything else is the book text exactly as printed, character for character, and code proves this on every run.
 
-On the sample book (28 pages, 89 mantras) with the default GPT-6 Luna model, a run takes 3–4 minutes and costs about 4 US cents. GPT-5.6 Luna gives the same rows for about 8 cents.
+On the sample book (28 pages, 89 mantras) with the default GPT-6 Luna model, a run takes 3–4 minutes and costs about 4 US cents. GPT-5.6 Luna gives the same rows for about 8 cents. On 24 pages of the Chandogya Upanishad, whose OCR prints the root text out of order, a run takes about 5 minutes and 5 cents.
 
 ## Run it on your computer
 
@@ -130,13 +130,15 @@ uv run python -m eval.bakeoff --book examples/mandala-brahmana --models openai/g
 ```
 agent/
   prompts/         The agents' instructions, as plain markdown files
-  core/            Text handling with no AI: pieces, labels, assembling rows, checks
+  core/            Text handling with no AI: pieces, labels, the Spec, assembling rows, checks
+  plan.py          The plan shown before the full run
+  export.py        Table, blocks and tree files
   agents/          The three agents and their tools
   orchestrator.py  Runs a book from OCR text to output files
   __main__.py      The command line
 web/
   app.py           The web server
-  static/          The page: index.html, app.css, app.js, the hero image
+  static/          The page: index.html, app.css, one script per screen, the image
 eval/              Scoring a run against expected output; comparing models
 examples/          A sample book with its request and expected output
 tests/             Tests (no API calls)
@@ -146,7 +148,8 @@ Dockerfile, render.yaml    Deployment on Render
 
 ## Current limits
 
-- **Tested on one book with two models.** The figures above are for the sample book with GPT-6 Luna and GPT-5.6 Luna. Other books and models may behave differently.
+- **Tested on two books.** The figures above are for the sample book with GPT-6 Luna and GPT-5.6 Luna, and 24 pages of the Chandogya Upanishad with GPT-6 Luna. Books with four or five levels of sections are handled by the code and its tests, but no real one has been run yet.
+- **Text scrambled inside one unit is not reordered.** If the OCR reads the second half of a mantra before the first, the output keeps the OCR order and lists it for review.
 - **Units must be numbered in the book**, with the number after each shloka, mantra or sutra (`॥ ५ ॥`). Unnumbered prose is not supported yet.
 - **Fixes are not made in the page yet.** The review list tells you what to check; you correct the downloaded file yourself.
 - **Footnotes** can be kept or dropped as a whole, but are not linked to the word they annotate.

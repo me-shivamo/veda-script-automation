@@ -13,7 +13,7 @@ from pydantic_ai.providers.openrouter import OpenRouterProvider
 load_dotenv()
 os.environ.setdefault("PYDANTIC_AI_NO_BANNER", "1")
 
-DEFAULT_MODEL = "openai/gpt-5.6-luna"
+DEFAULT_MODEL = "openai/gpt-6-luna"
 
 
 @dataclass

@@ -38,7 +38,7 @@ You get:
 - a **To review** list: the few places a person should check
 - a **Text changes** list: every character the code changed while copying (for example a misread verse number, or quote marks)
 
-On the sample book (28 pages, 89 mantras) with the GPT-5.6 Luna model, a run takes 2–3 minutes and costs about 7 US cents.
+On the sample book (28 pages, 89 mantras) with the default GPT-6 Luna model, a run takes 3–4 minutes and costs about 4 US cents. GPT-5.6 Luna gives the same rows for about 8 cents.
 
 ## Run it on your computer
 
@@ -90,7 +90,7 @@ It shows the plan and waits for `y`, `n`, or the change you want. Results go to 
 |---|---|
 | `--request` | What you want, as text or a path to a text file (required) |
 | `--examples` | CSV with a few rows of the output you want (optional, helps a lot) |
-| `--model` | OpenRouter model for all three agents (default `openai/gpt-5.6-luna`) |
+| `--model` | OpenRouter model for all three agents (default `openai/gpt-6-luna`) |
 | `--analyst-model`, `--labeler-model`, `--reviewer-model` | A different model for one agent |
 | `--escalation-model` | A stronger model for parts the Labeler cannot finish |
 | `--spec path/to/spec.json` | Reuse a saved plan and skip the Analyst (for more books in the same series) |
@@ -121,7 +121,7 @@ uv run pytest
 To score real runs against a book's expected output:
 
 ```bash
-uv run python -m eval.bakeoff --book examples/mandala-brahmana --models openai/gpt-5.6-luna --repeat 3
+uv run python -m eval.bakeoff --book examples/mandala-brahmana --models openai/gpt-6-luna --repeat 3
 ```
 
 ## Project layout
@@ -145,7 +145,7 @@ Dockerfile, render.yaml    Deployment on Render
 
 ## Current limits
 
-- **Tested on one book with one model.** The figures above are for the sample book with GPT-5.6 Luna. Other books and models may behave differently.
+- **Tested on one book with two models.** The figures above are for the sample book with GPT-6 Luna and GPT-5.6 Luna. Other books and models may behave differently.
 - **Units must be numbered in the book**, with the number after each shloka, mantra or sutra (`॥ ५ ॥`). Unnumbered prose is not supported yet.
 - **Fixes are not made in the page yet.** The review list tells you what to check; you correct the downloaded file yourself.
 - **Footnotes** can be kept or dropped as a whole, but are not linked to the word they annotate.

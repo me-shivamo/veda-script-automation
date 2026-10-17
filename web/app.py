@@ -36,12 +36,12 @@ TEMPORARY_STORAGE = bool(os.environ.get("RENDER")) and not os.environ.get("JOBS_
 JOB_ID = re.compile(r"^\d{8}-\d{6}-[a-z0-9-]+$")
 MAX_INPUT_CHARS = 5_000_000
 
-# Only the first model has been tested on real books so far.
+# The default comes first. Only the first two have been tested on real books so far.
 MODELS = [
     {"id": "openai/gpt-5.6-luna", "label": "GPT-5.6 Luna", "note": "tested"},
-    {"id": "openai/gpt-6-luna", "label": "GPT-6 Luna", "note": "untested"},
     {"id": "anthropic/claude-haiku-5.5", "label": "Claude Haiku 5.5", "note": "untested"},
     {"id": "google/gemini-3.8-flash", "label": "Gemini 3.8 Flash", "note": "untested"},
+    {"id": "openai/gpt-6-luna", "label": "GPT-6 Luna", "note": "tested"},
     {"id": "anthropic/claude-sonnet-5.5", "label": "Claude Sonnet 5.5", "note": "untested, costs more"},
     {"id": "openai/gpt-5.6-sol", "label": "GPT-5.6 Sol", "note": "untested, costs more"},
 ]

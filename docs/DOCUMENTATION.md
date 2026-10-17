@@ -134,7 +134,7 @@ The other fields:
 
 - **Example rows (optional).** A few rows of the output you want, as CSV. This is the most useful thing you can give the agents.
 - **Name of this run.** How the run appears in the list of past runs, and the name of the downloaded file.
-- **Model.** Which AI model to use. Only GPT-5.6 Luna has been tested.
+- **Model.** Which AI model to use. GPT-6 Luna is the default. It and GPT-5.6 Luna are the two tested models.
 - **Show me the plan before the full run.** Leave this ticked unless you have already run the same kind of book and trust the result.
 
 Click **Run extraction**.
@@ -257,9 +257,9 @@ Apart from these, every character in the output is exactly as in the text you lo
 
 ### How reliable is it?
 
-The tool has been measured on one book, the Mandala Brahmana Upanishad sample (28 pages, 89 mantras), with the GPT-5.6 Luna model:
+The tool has been measured on one book, the Mandala Brahmana Upanishad sample (28 pages, 89 mantras), with the GPT-6 Luna and GPT-5.6 Luna models:
 
-- In the most recent runs, all 50 rows that have an expected answer matched exactly, and all 89 rows came out the same from run to run.
+- In the most recent runs (two with each model), all 50 rows that have an expected answer matched exactly, and 87 of the 89 rows came out the same in every run. The other two differed only in a leading dash and in whether the closing colophon of the book was kept.
 - Earlier runs, before some of the checks existed, were wrong on up to 8 of the 89 rows.
 
 Results vary a little between runs, and a different book may bring problems this one did not. Treat the review list as part of the work, not as an optional extra.
@@ -419,7 +419,7 @@ uv run python -m agent run BOOK.md --request "what you want" [options]
 |---|---|
 | `--request` | What you want, as text or a path to a text file. Required. |
 | `--examples FILE.csv` | A few rows of the output you want. |
-| `--model ID` | OpenRouter model for all three agents. Default `openai/gpt-5.6-luna`. |
+| `--model ID` | OpenRouter model for all three agents. Default `openai/gpt-6-luna`. |
 | `--analyst-model`, `--labeler-model`, `--reviewer-model` | A different model for one agent. |
 | `--escalation-model ID` | A stronger model that retries any part the Labeler could not finish. |
 | `--effort` | How hard the model thinks: `minimal`, `low`, `medium` (default), `high`, `xhigh`. |
@@ -452,7 +452,7 @@ Each run gets its own folder under `jobs/`, named with the date, time and run na
 
 There are two separate costs.
 
-**AI models (OpenRouter).** You pay for what the models read and write. On the 28-page sample book with GPT-5.6 Luna, a run cost between 6 and 8 US cents. Cost grows roughly with the number of pages. Other models have not been tested here, and some cost many times more per run.
+**AI models (OpenRouter).** You pay for what the models read and write. On the 28-page sample book, a run cost about 4 US cents with GPT-6 Luna (the default) and 6 to 9 cents with GPT-5.6 Luna. Cost grows roughly with the number of pages. Other models have not been tested here, and some cost many times more per run.
 
 Every finished run shows its cost on the page and in `state.json`. Your OpenRouter dashboard shows the total.
 
@@ -561,7 +561,7 @@ uv run pytest
 ### Scoring real runs
 
 ```bash
-uv run python -m eval.bakeoff --book examples/mandala-brahmana --models openai/gpt-5.6-luna --repeat 3
+uv run python -m eval.bakeoff --book examples/mandala-brahmana --models openai/gpt-6-luna,openai/gpt-5.6-luna --repeat 3
 uv run python -m eval.score jobs/<run>/output.csv examples/mandala-brahmana
 ```
 
@@ -614,7 +614,7 @@ Limits: book text up to 5,000,000 characters, request up to 20,000, example rows
 
 **Limits today**
 
-- **One book, one model.** All measurements are from the sample book with GPT-5.6 Luna.
+- **One book, one model.** All measurements are from the sample book with GPT-6 Luna and GPT-5.6 Luna.
 - **Numbered units only.** Each shloka, mantra or sutra must end with its printed number. Books of unnumbered prose with side notes are not supported.
 - **No fixing in the page.** You correct the downloaded file by hand.
 - **Footnotes are all-or-nothing.** They can be kept or dropped, but are not linked to the word they annotate.

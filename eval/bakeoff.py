@@ -1,6 +1,6 @@
 """Run the whole pipeline on a test book with one or more models, and score each run.
 
-Usage: python -m eval.bakeoff --book examples/mandala-brahmana --models openai/gpt-5.6-luna[,other/model]
+Usage: python -m eval.bakeoff --book examples/mandala-brahmana --models openai/gpt-6-luna[,other/model]
 """
 
 import argparse
@@ -43,7 +43,7 @@ async def run_one(book: Path, config: RunConfig, label: str, quiet: bool = False
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--book", type=Path, required=True)
-    parser.add_argument("--models", default="openai/gpt-5.6-luna", help="Comma-separated OpenRouter model IDs; each is used for all three agents.")
+    parser.add_argument("--models", default="openai/gpt-6-luna", help="Comma-separated OpenRouter model IDs; each is used for all three agents.")
     parser.add_argument("--analyst-model", help="Use this model for the Analyst in every run.")
     parser.add_argument("--reviewer-model", help="Use this model for the Reviewer in every run.")
     parser.add_argument("--escalation-model")

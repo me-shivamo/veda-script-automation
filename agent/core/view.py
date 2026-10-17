@@ -24,7 +24,12 @@ def render_pieces(pieces: list[Piece], store: LabelStore | None = None) -> str:
             row += "  {" + ", ".join(hints) + "}"
         if store is not None:
             label = store.labels.get(p.id)
-            row += f"  [{label.role}{' ' + ','.join(map(str, label.n)) if label and label.n else ''}]" if label else "  [unlabelled]"
+            if label:
+                n = " " + ",".join(map(str, label.n)) if label.n else ""
+                at = " @" + ".".join(map(str, label.at)) if label.at else ""
+                row += f"  [{label.role}{n}{at}]"
+            else:
+                row += "  [unlabelled]"
             if p.id in store.flags:
                 row += " [flagged]"
         lines.append(row)

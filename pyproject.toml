@@ -5,6 +5,7 @@ description = "Agentic system that structures OCR text of Sanskrit books into pe
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.143.0",
+    "psycopg[binary]>=3.2",
     "pydantic-ai-slim[openrouter]>=2.55,<3",
     "python-dotenv>=1.0",
     "uvicorn>=0.30",

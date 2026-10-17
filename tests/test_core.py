@@ -1,5 +1,6 @@
 from agent.core.assemble import build
 from agent.core.duplicates import find_duplicate_pages
+from agent.core.fidelity import check_fidelity
 from agent.core.labels import LabelStore, Span
 from agent.core.pieces import make_pieces, split_piece
 from eval.score import load_gold, normalize
@@ -29,6 +30,12 @@ def test_line_is_cut_after_each_verse_marker():
     pieces = make_pieces("क ॥ ५ ॥ ख ग ॥ ६ ॥ घ\n॥ ७ ॥ ङ ॥८॥")
     assert [p.text for p in pieces] == ["क ॥ ५ ॥", "ख ग ॥ ६ ॥", "घ", "॥ ७ ॥", "ङ ॥८॥"]
     assert [p.printed_n for p in pieces] == [[5], [6], [], [7], [8]]
+
+
+def test_punctuation_after_a_verse_marker_stays_on_its_line():
+    pieces = make_pieces("क ॥ ४ ॥ -\nख ॥ ५ ॥ .\nग ॥ ६ ॥ - घ")
+    assert [p.text for p in pieces] == ["क ॥ ४ ॥ -", "ख ॥ ५ ॥ .", "ग ॥ ६ ॥", "- घ"]
+    assert [p.printed_n for p in pieces] == [[4], [5], [6], []]
 
 
 def test_ranges_unnumbered_dandas_and_pages():
@@ -73,8 +80,7 @@ def test_hand_labels_reproduce_expected_rows():
     for n in range(1, 11):
         num = f"1.1.{n}"
         assert {k: normalize(v) for k, v in got[num].items()} == gold[num], num
-    # Only quotes were changed, and every change is logged.
-    assert {c.kind for c in result.changes} == {"quotes_changed"}
+    assert not check_fidelity(text, pieces, result.records, result.dropped, pages=(1, 3))
 
 
 def test_sections_are_counted_by_code():
@@ -99,15 +105,26 @@ def test_shared_commentary_is_copied_to_each_unit():
     assert not result.issues
 
 
-def test_misread_verse_number_is_fixed_and_logged():
-    _, _, result = labelled(
-        "क ॥ ४ ॥\nटीका ॥ ४ ॥\n. ख ॥ ९ ॥\nटीका ॥ ९ ॥",
-        [("mula", [4]), ("bhashya", [4]), ("mula", [5]), ("bhashya", [5])],
-    )
-    assert result.records[1].fields == {"upanishad": "ख ॥ ५ ॥", "bhashya": "टीका ॥ ५ ॥"}
-    assert sorted(c.kind for c in result.changes) == ["leading_noise_removed", "verse_number_fixed", "verse_number_fixed"]
+def test_misread_verse_number_places_the_row_but_the_text_is_kept():
+    text = "क ॥ ४ ॥\nटीका ॥ ४ ॥\n. ख “उक्तम्” ॥ ९ ॥\nटीका ॥ ९ ॥"
+    pieces, _, result = labelled(text, [("mula", [4]), ("bhashya", [4]), ("mula", [5]), ("bhashya", [5])])
+    assert result.records[1].id == "1.1.5"
+    assert result.records[1].fields == {"upanishad": ". ख “उक्तम्” ॥ ९ ॥", "bhashya": "टीका ॥ ९ ॥"}
     assert kinds(result) == ["section_start_number", "printed_number_differs", "printed_number_differs"]
     assert not result.errors
+    assert not check_fidelity(text, pieces, result.records, result.dropped)
+
+
+def test_fidelity_check_catches_any_change_to_the_text():
+    text = "क ॥ १ ॥\nटीका  ॥ १ ॥\n---\n२७५ ग्रन्थनाम\nख ॥ २ ॥\nटीका ॥ २ ॥"
+    pieces, _, result = labelled(text, [("mula", [1]), ("bhashya", [1]), ("page_header", []), ("mula", [2]), ("bhashya", [2])])
+    assert result.records[0].fields["bhashya"] == "टीका  ॥ १ ॥"  # even a double space is kept
+    assert not check_fidelity(text, pieces, result.records, result.dropped)
+    altered = [r.model_copy(deep=True) for r in result.records]
+    altered[1].fields["upanishad"] = "ख ॥ ३ ॥"
+    assert [i.kind for i in check_fidelity(text, pieces, altered, result.dropped)] == ["not_verbatim"]
+    assert check_fidelity(text, pieces, result.records, [])  # the page header is neither kept nor removed
+    assert check_fidelity(text.replace("ख", "खा"), pieces, result.records, result.dropped)
 
 
 def test_heading_goes_to_the_next_unit_and_markdown_mark_is_removed():
@@ -140,7 +157,9 @@ def test_unlabelled_and_suspicious_drops_are_reported():
     result = build(pieces, store, spec)
     assert {"unlabelled", "dropped_content"} <= set(kinds(result, "error"))
     store.flag(["P0002", "P0003"], "cannot tell")
-    assert not {"unlabelled", "dropped_content"} & set(kinds(build(pieces, store, spec), "error"))
+    # A flag lets a person decide an unlabelled piece, but it never makes dropping book text acceptable.
+    errors = kinds(build(pieces, store, spec), "error")
+    assert "dropped_content" in errors and "unlabelled" not in errors
     # Relabelling a flagged piece clears its flag, so the new label is checked afresh.
     store.apply([Span(start="P0003", end="P0003", role="noise")], pieces, spec)
     assert "dropped_content" in kinds(build(pieces, store, spec), "error")
@@ -187,6 +206,22 @@ def test_heading_label_on_text_that_continues_a_line_is_reported():
         [("mula", [1]), ("heading", []), ("mula", [2]), ("bhashya", [1]), ("bhashya", [2])],
     )
     assert kinds(result, "error") == ["attached_mid_line"]
+
+
+def test_text_after_a_heading_or_section_close_cannot_attach_backwards():
+    # The opening verse of khanda 2 was attached back to khanda 1, past its closing line and a heading.
+    text = "क ॥ १ ॥\nटीका ॥ १ ॥\nइति प्रथमः खण्डः\nशीर्षकम्\nउक्तं च ।\nख ॥ १ ॥\nटीका ॥ १ ॥"
+    rows = [("mula", [1]), ("bhashya", [1]), ("khanda_end", []), ("heading", []), ("colophon", []), ("mula", [1]), ("bhashya", [1])]
+    _, _, wrong = labelled(text, rows)
+    assert sorted(kinds(wrong, "error")) == ["order_broken", "text_after_section_end"]
+    rows[4] = ("mula", [1])
+    _, _, right = labelled(text, rows)
+    assert not right.issues
+    # A colophon after the last closing line is fine: the book ends there.
+    _, _, end = labelled("क ॥ १ ॥\nटीका ॥ १ ॥\nइति प्रथमः खण्डः\nइति श्री… सम्पूर्णम्",
+                         [("mula", [1]), ("bhashya", [1]), ("khanda_end", []), ("colophon", [])])
+    assert not end.issues
+    assert end.records[0].fields["bhashya"] == "टीका ॥ १ ॥ इति प्रथमः खण्डः इति श्री… सम्पूर्णम्"
 
 
 def test_text_after_a_passage_number_cannot_keep_that_number():

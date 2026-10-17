@@ -124,7 +124,7 @@ def test_whole_job_runs_chunks_in_parallel_and_code_numbers_the_sections(monkeyp
         ["1.2.1", "ग ॥ १ ॥", "टीका ॥ १ ॥"],
     ]
     assert job.path("output.csv").read_text(encoding="utf-8").startswith('"num","upanishad","bhashya"\n')
-    for name in ("labels.json", "issues.json", "changes.json", "pieces.json", "state.json", "trace.jsonl"):
+    for name in ("labels.json", "issues.json", "removed.json", "pieces.json", "state.json", "trace.jsonl"):
         assert job.has(name), name
 
 

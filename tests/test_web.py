@@ -24,7 +24,9 @@ def scripted(messages, info):
             ToolCallPart("overview", {}),
             ToolCallPart("draft_spec", {"spec": mandala_spec().model_dump()}),
             ToolCallPart("trial_run", {"first_page": 1, "last_page": 2}),
-            ToolCallPart("submit", {"summary": "One row per mantra with its commentary.", "limitations": ["No translation is printed."]}),
+            ToolCallPart("submit", {"summary": "One row per mantra with its commentary.", "limitations": ["No translation is printed."],
+                                    "outline": [{"path": "1.1", "label": "प्रथमः खण्डः", "evidence": ["P0001"], "units": "1–2"}],
+                                    "questions": ["Keep the closing line in the commentary?"]}),
         ]
         return ModelResponse(parts=[calls[min(step, 3)]])
     if step == 0:  # a Labeler
@@ -83,8 +85,26 @@ def test_run_waits_for_approval_then_produces_rows(client):
     assert proposal["summary"] == "One row per mantra with its commentary."
     assert proposal["limitations"] == ["No translation is printed."]
     assert proposal["columns"] == ["num", "upanishad", "bhashya"]
-    assert [row["label"] for row in proposal["rows"]] == ["mantra 1", "mantra 2"]
+    assert proposal["version"] == 1 and proposal["questions"] == ["Keep the closing line in the commentary?"]
+    assert proposal["outline"][0]["evidence"][0]["found"] and proposal["structure"]["levels"][0]["name"] == "brahmana"
+    preview = proposal["preview"]
+    assert preview["table"]["columns"] == ["num", "upanishad", "bhashya"] and [row[0] for row in preview["table"]["rows"]] == ["1.1.1", "1.1.2"]
+    assert preview["blocks"]["columns"][-2:] == ["layer", "text"] and "brahmanas" in preview["tree"]
     assert "Roles" in proposal["rules"]
+
+    # A change to the output structure is made by code: no agent runs, and the plan comes back as version 2.
+    bad = client.post(f"/api/runs/{run_id}/decision", json={"action": "edit", "edits": [{"op": "rename_column", "column": "bhashya", "to": "upanishad"}]})
+    assert bad.status_code == 422 and "cannot be a column name" in bad.json()["detail"]
+    edit = {"action": "edit", "edits": [{"op": "rename_column", "column": "upanishad", "to": "mula"}, {"op": "set_output", "id_style": "columns"}]}
+    assert client.post(f"/api/runs/{run_id}/decision", json=edit).json() == {"ok": True}
+    deadline = time.time() + 10
+    while (proposal := client.get(f"/api/runs/{run_id}").json()["proposal"]) is None or proposal["version"] != 2:
+        assert time.time() < deadline
+        time.sleep(0.05)
+    assert proposal["columns"] == ["num", "mula", "bhashya"]
+    assert proposal["preview"]["table"]["columns"] == ["brahmana", "khanda", "mantra", "mula", "bhashya"]
+    assert "Column upanishad is now called mula." in proposal["changes"]
+    assert [plan["version"] for plan in client.get(f"/api/runs/{run_id}/plans").json()] == [1, 2]
 
     assert client.post(f"/api/runs/{run_id}/decision", json={"action": "revise", "feedback": ""}).status_code == 422
     assert client.post(f"/api/runs/{run_id}/decision", json={"action": "approve"}).json() == {"ok": True}
@@ -93,13 +113,18 @@ def test_run_waits_for_approval_then_produces_rows(client):
     assert client.post(f"/api/runs/{run_id}/decision", json={"action": "approve"}).status_code == 409
 
     result = client.get(f"/api/runs/{run_id}/result").json()
-    assert result["columns"] == ["num", "upanishad", "bhashya"]
+    assert result["columns"] == ["num", "mula", "bhashya"]
+    assert result["shapes"] == {"table": True, "blocks": True, "tree": True} and result["plan"]["version"] == 2
+    assert [m["mantra"] for m in result["tree"]["brahmanas"][0]["khandas"][0]["mantras"]] == [1, 2]
     assert [row["id"] for row in result["rows"]] == ["1.1.1", "1.1.2", "1.2.1"]
     assert result["rows"][1]["cells"] == ["ख ॥ २ ॥", "शीर्षकम् टीका ॥ २ ॥ इति प्रथमः खण्डः"]
     assert result["issues"] == [] and result["card"]["name"] == "Tiny Book"
 
     csv_file = client.get(f"/api/runs/{run_id}/download/csv")
-    assert csv_file.text.startswith('"num","upanishad","bhashya"\n') and 'filename="Tiny-Book.csv"' in csv_file.headers["content-disposition"]
+    assert csv_file.text.startswith('"brahmana","khanda","mantra","mula","bhashya"\n') and 'filename="Tiny-Book.csv"' in csv_file.headers["content-disposition"]
+    blocks = client.get(f"/api/runs/{run_id}/download/blocks")
+    assert blocks.text.startswith('"path","brahmana","khanda","mantra","layer","text"\n') and "Tiny-Book-blocks.csv" in blocks.headers["content-disposition"]
+    assert client.get(f"/api/runs/{run_id}/download/tree").json()["structure"]["unit"] == "mantra"
     assert client.get(f"/api/runs/{run_id}/input").json()["input"] == BOOK
     assert client.get("/api/runs").json()[0] | {"created": 0, "seconds": 0, "cost_usd": 0} == {
         "id": run_id, "name": "Tiny Book", "model": "openai/gpt-6-luna", "created": 0, "phase": "done", "rows": 3, "cost_usd": 0, "seconds": 0}
@@ -117,8 +142,11 @@ def test_feedback_sends_the_plan_back_and_stop_ends_the_run(client):
 
 
 def test_run_without_approval_step_and_bad_requests(client):
-    run_id = start(client, ask_approval=False)
+    run_id = start(client, ask_approval=False, output={"shape": "tree", "columns": ["num", "mula", "bhashya"]})
     assert wait_for(client, run_id, {"done", "failed"})["phase"] == "done"
+    request = client.get(f"/api/runs/{run_id}/input").json()["request"]
+    assert "Output shape: a tree" in request and "Columns, in this order: num, mula, bhashya." in request
+    assert client.post("/api/runs", json={"input": "x", "request": "x", "output": {"shape": "pyramid"}}).status_code == 422
     assert client.post("/api/runs", json={"input": "", "request": "x"}).status_code == 422
     assert client.post("/api/runs", json={"input": "x", "request": "x", "model": "made/up"}).status_code == 422
     assert client.get("/api/runs/../../etc").status_code == 404

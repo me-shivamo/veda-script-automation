@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from agent.core.labels import Span
-from agent.core.spec import FieldDef, RoleDef, SectionEdge, Spec, TextOptions
+from agent.core.spec import FieldDef, RoleDef, SectionEdge, Spec
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 
@@ -28,12 +28,12 @@ def mandala_spec() -> Spec:
                     section=SectionEdge(level="khanda", edge="end")),
             RoleDef(name="brahmana_end", description="इति … ब्राह्मणम्", kind="attach_prev", field="bhashya",
                     section=SectionEdge(level="brahmana", edge="end")),
+            RoleDef(name="colophon", description="Closing verses and colophon.", kind="attach_prev", field="bhashya"),
             RoleDef(name="book_title", description="Book title.", kind="drop"),
             RoleDef(name="page_header", description="Running header.", kind="drop"),
             RoleDef(name="footnote", description="Footnote.", kind="drop"),
             RoleDef(name="noise", description="Printer's marks.", kind="drop"),
         ],
-        text=TextOptions(quotes="single"),
         labeling_guide="Mantra first, then its commentary; both end with the same number.",
     )
 

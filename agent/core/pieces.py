@@ -9,14 +9,14 @@ import re
 
 from pydantic import BaseModel
 
-from .devanagari import VERSE_MARKER, marker_numbers
+from .devanagari import VERSE_MARKER, marker_numbers, other_script
 
 PAGE_BREAK = re.compile(r"^\s*-{3,}\s*$")
 _FOOTNOTE_DEF = re.compile(r"^\[\^\w+\]:")
 _FOOTNOTE_LINE = re.compile(r"^['‘’\"]?\s*[0-9०-९]{1,2}[.)]?\s+\S")
 _SIGLA = re.compile(r"[—–-]\s*[\"“]?(?:अ|उ|क|ख|ग)(?:\s?[१२३1-3])?(?=[\s.,]|$)")
 _EDGE_NUMBER = re.compile(r"^[0-9०-९]+\b|[0-9०-९]+\s*$")
-_DIGITS_ONLY = re.compile(r"^[0-9]{1,4}$")
+_DIGITS_ONLY = re.compile(r"^[0-9०-९]{1,4}\.?$")
 
 
 class Piece(BaseModel):
@@ -42,23 +42,36 @@ def _hints(text: str, *, first_on_page: bool) -> list[str]:
         hints.append("page-top-number")
     if len(text) <= 45 and "।" not in text and "॥" not in text:
         hints.append("short")
+    if other_script(text):
+        hints.append("other-script")
+    if len(text) <= 70 and ("[" in text or "]" in text) and not _FOOTNOTE_DEF.match(text):
+        hints.append("header-like")
     return hints
+
+
+def _has_text(text: str) -> bool:
+    """True if text has a letter or digit, not only punctuation such as '-', '.' or '।'."""
+    return any(ch.isalnum() for ch in text)
 
 
 def _printed_n(text: str) -> list[int]:
     last = None
     for last in VERSE_MARKER.finditer(text):
         pass
-    if last is None or text[last.end():].strip(" .।"):
+    if last is None or _has_text(text[last.end():]):
         return []
     return marker_numbers(last)
 
 
 def _cut_line(line: str) -> list[str]:
-    """Cut a line after each verse marker that has more text following it."""
+    """Cut a line after each verse marker that has more text following it.
+
+    Punctuation alone after a marker (a stray '-' or '.') stays on the marker's piece, so it is
+    kept exactly where the book prints it instead of becoming a piece an agent has to guess about.
+    """
     parts, start = [], 0
     for m in VERSE_MARKER.finditer(line):
-        if line[m.end():].strip():
+        if _has_text(line[m.end():]):
             parts.append(line[start:m.end()].strip())
             start = m.end()
     parts.append(line[start:].strip())

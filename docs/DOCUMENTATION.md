@@ -318,18 +318,35 @@ You can change `APP_USERNAME` the same way.
 | Cost | Nothing. A workspace gets 750 free hours a month. |
 | Sleep | The service sleeps after 15 minutes with no visitors. |
 | Waking up | The first visit after a sleep takes about a minute. |
-| **Saved runs** | **Lost whenever the service restarts, redeploys or sleeps.** |
+| **Saved runs** | **Lost whenever the service restarts, redeploys or sleeps, unless a database is connected** (see [Keeping runs permanently](#keeping-runs-permanently)). |
 | Restarts | Render may restart a free service at any time. |
 
 In practice:
 
-- **Download the output of every run you want to keep**, as soon as it finishes. The page shows a reminder about this.
+- **Without a database, download the output of every run you want to keep** as soon as it finishes. The page shows a reminder about this.
 - **Keep the page open while a run is in progress.** The open page keeps the service awake. If the service restarts in the middle of a run, that run is lost and shows as "Interrupted".
 - A short book finishes in a few minutes, so sleeping is rarely a problem during a run.
 
 ### Keeping runs permanently
 
-To keep past runs, the service needs a **persistent disk**, and disks are only available on paid instances.
+On the free plan the service loses its files whenever it restarts, redeploys or sleeps. There are two ways to keep runs anyway.
+
+**Option 1 (recommended): a free Postgres database.** The app keeps a copy of every run in the database. After a restart it brings the list of runs back, and it fetches a run's files the first time someone opens it. Nothing else changes, and the service can stay on the free plan.
+
+[Neon](https://neon.com) is the best fit. Its free plan does not expire, and a run of the 28-page sample book takes about 100 KB in the database, so the free storage holds thousands of runs. Two other options are worse for this: Render's own free database is deleted after 30 days, and a free Supabase project is paused after a week of little use.
+
+1. Sign up at [neon.com](https://neon.com) and create a project. Choose the region **AWS Asia Pacific (Singapore)**, next to the Render service.
+2. On the project dashboard, click **Connect** and copy the connection string. It starts with `postgresql://`.
+3. On the Render service's **Environment** page, add `DATABASE_URL` with that string as its value, then save. Render restarts the service.
+4. Start a run. When it has finished, open the service's **Manual Deploy** menu and click **Restart service**. Then reload the page: the run is still in the list.
+
+The app creates its table (`job_files`) the first time it starts. If the connection string is wrong, the service does not start, and the service's **Logs** show why. Render keeps the previous copy running until the problem is fixed.
+
+The free database sleeps after five minutes without use. The next request wakes it in about a second.
+
+A run is saved when it starts and again when it ends. When the service shuts down, it stops the runs in progress and saves each one as "Stopped". The input is kept, so a stopped run can be started again. A run in progress is lost only if the service crashes without shutting down. It then shows as "Interrupted", and its input is still there.
+
+**Option 2: a paid instance with a disk.** The runs stay in their folders on a **persistent disk**. Disks are only available on paid instances.
 
 Change `render.yaml` like this, then commit and push:
 
@@ -397,6 +414,7 @@ All settings are environment variables. On your computer they go in the `.env` f
 | `APP_PASSWORD` | empty | When set, every page and every request asks for the username and password. When empty, there is no sign-in at all. |
 | `APP_USERNAME` | `veda` | The username that goes with `APP_PASSWORD`. |
 | `JOBS_DIR` | `./jobs` | The folder where runs are kept. |
+| `DATABASE_URL` | empty | A Postgres connection string. When set, every run is also kept in that database and comes back after the host wipes its files. See [Keeping runs permanently](#keeping-runs-permanently). |
 | `MAX_ACTIVE_RUNS` | `3` | How many runs may be in progress at the same time. A further run is refused until one finishes. This limits how fast credit can be spent. |
 | `HOST` | `127.0.0.1` | The network address the server listens on. `127.0.0.1` means this computer only. `0.0.0.0` means any computer that can reach it. |
 | `PORT` | `8000` | The port the server listens on. Render sets this itself. |
@@ -456,7 +474,7 @@ There are two separate costs.
 
 Every finished run shows its cost on the page and in `state.json`. Your OpenRouter dashboard shows the total.
 
-**Hosting (Render).** The free plan costs nothing. A paid instance with a disk has a monthly price; see [Render's pricing page](https://render.com/pricing).
+**Hosting (Render).** The free plan costs nothing, and so does a free Neon database. A paid instance with a disk has a monthly price; see [Render's pricing page](https://render.com/pricing).
 
 To keep spending under control:
 
@@ -487,6 +505,7 @@ To keep spending under control:
 | The browser keeps asking for the password | Wrong username or password | The username is `veda` unless you changed `APP_USERNAME`. Copy the password from Render's **Environment** page. |
 | The page takes a minute to open on Render | The free service was asleep | Wait. It only happens on the first visit after a quiet spell. |
 | Past runs have disappeared on Render | The free plan clears files on every restart | See [Keeping runs permanently](#keeping-runs-permanently). |
+| A run's log says "Could not save this run to the database" | The database could not be reached when the run started or ended | Download the output. Check `DATABASE_URL` and the database provider's status page. |
 | A run shows "Interrupted" | The server restarted while it was in progress | Start the run again. |
 | "3 runs are already in progress" | The limit on runs at once was reached | Wait for one to finish, or raise `MAX_ACTIVE_RUNS`. |
 | The plan looks wrong | The request was unclear, or the book is laid out in an unusual way | Type what should change and click **Send the change**. Adding example rows helps most. |
@@ -557,6 +576,7 @@ uv run pytest
 
 - `test_core.py` tests the text handling with hand-written labels. One test labels the first three pages of the sample book by hand and checks the rows against the expected output.
 - `test_agents_offline.py` and `test_web.py` drive the agents and the web server with a scripted stand-in for the model. They make no API calls.
+- `test_store.py` checks that runs come back from the database after the files are wiped. It needs a Postgres database it may empty: `TEST_DATABASE_URL=postgresql://... uv run pytest`. Without one, those tests are skipped.
 
 ### Scoring real runs
 

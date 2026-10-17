@@ -70,7 +70,7 @@ The repository includes everything Render needs: [render.yaml](render.yaml) and 
 
 Three things to know before you rely on it:
 
-- **The free plan forgets its runs.** Its files are wiped whenever the service restarts, redeploys, or sleeps after 15 minutes without visitors. Download any output you want to keep. Keeping runs permanently needs a paid instance with a disk.
+- **The free plan forgets its runs unless you connect a database.** Its files are wiped whenever the service restarts, redeploys, or sleeps after 15 minutes without visitors. Set `DATABASE_URL` to a free [Neon](https://neon.com) Postgres database and every run is kept. See [Keeping runs permanently](docs/DOCUMENTATION.md#keeping-runs-permanently).
 - **The first visit after a sleep takes about a minute** while Render wakes the service.
 - **Everyone shares one password.** Anyone who has it can start runs, and runs spend your OpenRouter credit.
 
@@ -107,6 +107,7 @@ All settings are environment variables. On your computer, put them in `.env`. On
 | `APP_PASSWORD` | On any public copy | When set, the browser asks for a username and password before showing anything. |
 | `APP_USERNAME` | No | The username that goes with it. Default `veda`. |
 | `JOBS_DIR` | No | Folder where runs are kept. Default `./jobs`. On a host, point it at a persistent disk. |
+| `DATABASE_URL` | No | Postgres connection string. Keeps a copy of every run, so runs survive a host that wipes its files. |
 | `MAX_ACTIVE_RUNS` | No | How many runs may be in progress at once. Default `3`. |
 | `HOST`, `PORT` | No | Where the server listens. Defaults `127.0.0.1` and `8000`. Render sets these itself. |
 

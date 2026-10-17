@@ -33,13 +33,20 @@ def scripted(messages, info):
 
 
 @pytest.fixture
-def client(monkeypatch, tmp_path):
+def scripted_app(monkeypatch, tmp_path):
+    """The web app with scripted models and an empty jobs folder, not started yet."""
     for module in (analyst_module, labeler_module, reviewer_module):
         monkeypatch.setattr(module, "make_model", lambda model_id: FunctionModel(scripted))
         monkeypatch.setattr(module, "price", lambda model_id: None)
     monkeypatch.setattr(web, "JOBS", tmp_path)
     monkeypatch.setattr(web, "RUNS", {})
-    with TestClient(web.app) as test_client:
+    monkeypatch.setattr(web, "STORE", None)
+    return web.app
+
+
+@pytest.fixture
+def client(scripted_app):
+    with TestClient(scripted_app) as test_client:
         yield test_client
 
 

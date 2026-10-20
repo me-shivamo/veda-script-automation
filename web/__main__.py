@@ -12,6 +12,8 @@ def main() -> None:
     parser.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"), help="Use 0.0.0.0 to let other machines connect.")
     parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", "8000")))
     args = parser.parse_args()
+    # Only a server that nobody else can reach may change the Claude connection or run on a Claude plan.
+    os.environ["VEDA_LOCAL"] = "1" if args.host in ("127.0.0.1", "localhost", "::1") else "0"
     if args.host != "127.0.0.1" and not os.environ.get("APP_PASSWORD"):
         print("WARNING: other machines can reach this server and APP_PASSWORD is not set. Anyone who can open it can spend your Anthropic credit.")
     print(f"Open http://{'localhost' if args.host == '127.0.0.1' else args.host}:{args.port}", flush=True)

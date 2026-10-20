@@ -10,6 +10,8 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from anthropic import AsyncAnthropic, AuthenticationError
+from dotenv import set_key, unset_key
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
@@ -17,7 +19,8 @@ from pydantic import BaseModel, Field
 from pydantic_ai.exceptions import AgentRunError, ModelHTTPError
 
 from agent.agents.analyst import AnalystResult
-from agent.agents.models import DEFAULT_MODEL, ModelConfig
+from agent.agents.models import DEFAULT_MODEL, ModelConfig, api_model
+from agent.agents.subscription import PREFIX as SUBSCRIPTION, check_connection
 from agent.core.spec import Spec, StructureEdit, apply_structure_edits
 from agent.jobs import Job
 from agent.orchestrator import RunConfig, run_job
@@ -40,11 +43,21 @@ TEMPORARY_STORAGE = bool(os.environ.get("RENDER")) and not os.environ.get("JOBS_
 JOB_ID = re.compile(r"^\d{8}-\d{6}-[a-z0-9-]+$")
 MAX_INPUT_CHARS = 5_000_000
 
-# The default comes first. None has been tested on a real book through the Claude API yet.
-MODELS = [
-    {"id": "claude-opus-5-5", "label": "Claude Opus 5.5", "note": "most capable"},
-    {"id": "claude-sonnet-5-5", "label": "Claude Sonnet 5.5", "note": "half the price of Opus"},
-    {"id": "claude-haiku-5-5", "label": "Claude Haiku 5.5", "note": "cheapest"},
+# Set by `python -m web` when the server listens only on this computer. Only then can the page change the
+# Claude connection, and only then may runs use a Claude plan: Anthropic does not allow a claude.ai login
+# to power a service for other people.
+LOCAL = os.environ.get("VEDA_LOCAL") == "1"
+ENV_FILE = ROOT / ".env"
+# The most capable first. None has been tested on a real book through Claude yet.
+API_MODELS = [
+    {"id": "claude-opus-5-5", "label": "Claude Opus 5.5", "note": "API key, most capable"},
+    {"id": "claude-sonnet-5-5", "label": "Claude Sonnet 5.5", "note": "API key, half the price of Opus"},
+    {"id": "claude-haiku-5-5", "label": "Claude Haiku 5.5", "note": "API key, cheapest"},
+]
+PLAN_MODELS = [
+    {"id": SUBSCRIPTION + "claude-opus-5-5", "label": "Claude Opus 5.5", "note": "your Claude plan"},
+    {"id": SUBSCRIPTION + "claude-sonnet-5-5", "label": "Claude Sonnet 5.5", "note": "your Claude plan, uses less of it"},
+    {"id": SUBSCRIPTION + "claude-haiku-5-5", "label": "Claude Haiku 5.5", "note": "your Claude plan, uses the least"},
 ]
 STATE_TO_PHASE = {"DONE": "done", "NEEDS_HUMAN": "needs_review", "STOPPED": "stopped", "FAILED": "failed"}
 ACTIVE = {"starting", "analysing", "awaiting_approval", "labelling", "reviewing", "assembling"}
@@ -131,7 +144,7 @@ class NewRun(BaseModel):
     input: str = Field(min_length=1, max_length=MAX_INPUT_CHARS)
     request: str = Field(min_length=1, max_length=20_000)
     examples: str = Field(default="", max_length=200_000)
-    model: str = Field(default=DEFAULT_MODEL, max_length=100)
+    model: str = Field(default=DEFAULT_MODEL, max_length=120)
     ask_approval: bool = True
     output: OutputWish = Field(default_factory=OutputWish)
 
@@ -174,10 +187,37 @@ def _job(job_id: str) -> Job:
     return Job(JOBS / job_id)
 
 
+def _plan_login() -> str | None:
+    """How Claude Code signs in to the Claude plan here: a token saved on the page, the login of `claude`, or neither."""
+    if os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"):
+        return "token"
+    config_dir = Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude")
+    return "login" if (config_dir / ".credentials.json").exists() else None
+
+
+def _default_model() -> str:
+    if LOCAL and _plan_login():
+        return PLAN_MODELS[0]["id"]
+    return DEFAULT_MODEL
+
+
+def _models() -> list[dict]:
+    """The models a run may use here, the default first."""
+    plan = PLAN_MODELS if LOCAL else []
+    return plan + API_MODELS if _default_model().startswith(SUBSCRIPTION) else API_MODELS + plan
+
+
+def _connection() -> dict:
+    key = os.environ.get("ANTHROPIC_API_KEY", "")
+    return {"local": LOCAL, "plan": _plan_login() if LOCAL else None, "api_key": bool(key), "api_key_end": key[-4:] if key else ""}
+
+
 def _explain(error: Exception) -> str:
     text = str(error)
     if "ANTHROPIC_API_KEY" in text:
-        return "The Anthropic API key is not set. Put ANTHROPIC_API_KEY in the .env file and restart the server."
+        return "No Anthropic API key is saved. Add one under Claude connection, or pick a model that runs on your Claude plan."
+    if "your Claude plan" in text:
+        return text[:500]
     if isinstance(error, ModelHTTPError) and error.status_code == 401:
         return "Anthropic rejected the API key. Check ANTHROPIC_API_KEY in the .env file."
     if isinstance(error, ModelHTTPError) and (error.status_code == 402 or "credit balance" in text.lower()):
@@ -265,8 +305,88 @@ def _card(job: Job) -> dict:
 def config() -> dict:
     samples = [{"id": d.name, "name": d.name.replace("-", " ").title()} for d in sorted(EXAMPLES.glob("*"))
                if (d / "input.md").exists() and (d / "request.txt").exists()]
-    return {"default_model": DEFAULT_MODEL, "models": MODELS, "key_configured": bool(os.environ.get("ANTHROPIC_API_KEY")),
-            "samples": samples, "temporary_storage": TEMPORARY_STORAGE}
+    connection = _connection()
+    return {"default_model": _default_model(), "models": _models(), "key_configured": connection["api_key"] or bool(connection["plan"]),
+            "connection": connection, "samples": samples, "temporary_storage": TEMPORARY_STORAGE}
+
+
+class ConnectionChange(BaseModel):
+    """What the Claude connection form saves. A missing field is left as it is; an empty one is removed."""
+
+    plan_token: str | None = Field(default=None, max_length=500)
+    api_key: str | None = Field(default=None, max_length=500)
+
+
+def _local_only() -> None:
+    if not LOCAL:
+        raise HTTPException(403, "The Claude connection can only be changed on a copy running on your own computer.")
+
+
+def _save_setting(name: str, value: str) -> None:
+    """Keep the value in .env, which Git ignores, and use it from now on without a restart."""
+    if value:
+        ENV_FILE.touch(mode=0o600, exist_ok=True)
+        set_key(ENV_FILE, name, value, quote_mode="never")
+        os.environ[name] = value
+    else:
+        if ENV_FILE.exists():
+            unset_key(ENV_FILE, name, quote_mode="never")
+        os.environ.pop(name, None)
+
+
+@app.get("/api/connection")
+def connection() -> dict:
+    return _connection()
+
+
+@app.post("/api/connection")
+def change_connection(body: ConnectionChange) -> dict:
+    _local_only()
+    token = (body.plan_token or "").strip()
+    key = (body.api_key or "").strip()
+    if body.plan_token is not None:
+        if token.startswith("sk-ant-api"):
+            raise HTTPException(422, "That is an API key, not a Claude plan token. Paste it in the API key box instead.")
+        if token and (not token.startswith("sk-ant-") or any(c.isspace() for c in token)):
+            raise HTTPException(422, "That does not look like a token from `claude setup-token`. It starts with sk-ant-oat.")
+        _save_setting("CLAUDE_CODE_OAUTH_TOKEN", token)
+    if body.api_key is not None:
+        if key.startswith("sk-ant-oat"):
+            raise HTTPException(422, "That is a Claude plan token, not an API key. Paste it in the Claude plan box instead.")
+        if key and (not key.startswith("sk-ant-") or any(c.isspace() for c in key)):
+            raise HTTPException(422, "That does not look like an Anthropic API key. It starts with sk-ant-api.")
+        _save_setting("ANTHROPIC_API_KEY", key)
+        api_model.cache_clear()  # models made with the old key
+    return _connection()
+
+
+class ConnectionTest(BaseModel):
+    via: str = Field(pattern="^(plan|api)$")
+
+
+@app.post("/api/connection/test")
+async def test_connection(body: ConnectionTest) -> dict:
+    """Make the smallest possible call, so the page can say whether the connection works before a run depends on it."""
+    _local_only()
+    if body.via == "plan":
+        if not _plan_login():
+            return {"ok": False, "message": "No Claude plan login on this computer yet. Paste a token from `claude setup-token`."}
+        try:
+            await check_connection()
+        except RuntimeError as error:
+            return {"ok": False, "message": str(error)[:500]}
+        how = "the saved token" if _plan_login() == "token" else "this computer's Claude Code login"
+        return {"ok": True, "message": f"Connected to your Claude plan through {how}."}
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        return {"ok": False, "message": "No API key is saved."}
+    try:
+        async with AsyncAnthropic(api_key=os.environ["ANTHROPIC_API_KEY"], max_retries=1) as client:
+            await client.models.retrieve(DEFAULT_MODEL)
+    except AuthenticationError:
+        return {"ok": False, "message": "Anthropic rejected this API key."}
+    except Exception as error:
+        return {"ok": False, "message": f"Could not reach Anthropic: {type(error).__name__}: {str(error)[:300]}"}
+    return {"ok": True, "message": "The API key works."}
 
 
 @app.get("/healthz")
@@ -293,7 +413,7 @@ def list_runs() -> list[dict]:
 
 @app.post("/api/runs")
 async def start_run(body: NewRun) -> dict:
-    if not any(m["id"] == body.model for m in MODELS):
+    if not any(m["id"] == body.model for m in _models()):
         raise HTTPException(422, "That model is not in the list.")
     active = sum(1 for run in RUNS.values() if run.phase in ACTIVE)
     if active >= MAX_ACTIVE_RUNS:

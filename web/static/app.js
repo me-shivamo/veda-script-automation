@@ -3,6 +3,7 @@
 //   #/new           a new extraction (the book, then the request)
 //   #/runs/<id>     one run: plan, progress, output   (#/runs/<id>/review opens a tab)
 
+import { setupConnection } from "./connection.js";
 import { renderNew } from "./newrun.js";
 import { leaveRun, renderRun } from "./run.js";
 import { renderRuns } from "./runs.js";
@@ -38,6 +39,12 @@ async function init() {
     return;
   }
   $("keyWarning").hidden = config.key_configured;
+  // After the connection changes, the list of models and the default change with it.
+  setupConnection(config, async () => {
+    config = await api("/api/config");
+    $("keyWarning").hidden = config.key_configured;
+    if (location.hash.startsWith("#/new")) route();
+  });
 
   const help = $("help");
   $("helpButton").addEventListener("click", () => help.showModal());

@@ -417,3 +417,14 @@ mark { background: var(--pumpkin-100); color: inherit; border-radius: 0.2rem; }
   .rail li.is-busy .rail__dot, .spinner { animation: none; }
   .button { transition: none; }
 }
+
+/* The Claude connection dialog */
+.appbar__connection { color: var(--ink-0); }
+.appbar__connection:hover:not([disabled]) { background: rgba(255, 255, 255, 0.12); }
+.linkbutton { background: none; border: 0; padding: 0; font: inherit; color: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.connection h3 { margin: 0 0 0.5rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.connection .steps { margin: 0.25rem 0 0.5rem; padding-left: 1.25rem; }
+.connection__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+.pill { font-family: var(--font-sans); font-size: 0.75rem; font-weight: 400; padding: 0.15rem 0.6rem; border-radius: 9999px; background: var(--grey-50); color: var(--grey-700); border: 1px solid #e0d2c8; }
+.pill--ok { background: var(--green-50); color: var(--green-700); border-color: #b8dcc8; }
+.hint--ok { color: var(--green-700); }

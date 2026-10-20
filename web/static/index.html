@@ -24,14 +24,17 @@
       <nav class="appbar__nav" aria-label="Main">
         <a class="navlink" href="#/" data-nav="runs">Runs</a>
         <a class="button button--sm button--primary" href="#/new" data-nav="new">New extraction</a>
+        <button class="button button--sm button--ghost appbar__connection" id="connectionButton" type="button" data-open-connection hidden>Claude connection</button>
         <button class="iconbutton" id="helpButton" type="button" aria-label="How it works" title="How it works">?</button>
       </nav>
     </div>
   </header>
 
-  <div class="banner banner--warn banner--top" id="keyWarning" hidden>The Anthropic API key is not set. Put <code>ANTHROPIC_API_KEY</code> in the <code>.env</code> file and restart the server.</div>
+  <div class="banner banner--warn banner--top" id="keyWarning" hidden>Not connected to Claude yet. <button class="linkbutton" type="button" data-open-connection>Connect your Claude plan or an API key</button></div>
 
   <main id="view" class="view" tabindex="-1"></main>
+
+  <dialog class="dialog" id="connection" aria-labelledby="connectionTitle"></dialog>
 
   <dialog class="dialog" id="help" aria-labelledby="helpTitle">
     <div class="dialog__head">

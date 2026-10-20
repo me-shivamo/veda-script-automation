@@ -44,10 +44,17 @@ JOB_ID = re.compile(r"^\d{8}-\d{6}-[a-z0-9-]+$")
 MAX_INPUT_CHARS = 5_000_000
 
 # Set by `python -m web` when the server listens only on this computer. Only then can the page change the
-# Claude connection, and only then may runs use a Claude plan: Anthropic does not allow a claude.ai login
-# to power a service for other people.
+# Claude connection; a hosted copy takes it from its environment settings.
 LOCAL = os.environ.get("VEDA_LOCAL") == "1"
 ENV_FILE = ROOT / ".env"
+# Anthropic does not allow a claude.ai login to power a service for other people. A copy that others can reach
+# may run on a Claude plan only when its owner declares they are its only user (ALLOW_CLAUDE_PLAN=1) and it
+# asks for a password.
+def _plan_allowed(local: bool, allow: str, password: str) -> bool:
+    return local or (allow == "1" and bool(password))
+
+
+PLAN_ALLOWED = _plan_allowed(LOCAL, os.environ.get("ALLOW_CLAUDE_PLAN", ""), APP_PASSWORD)
 # The most capable first. None has been tested on a real book through Claude yet.
 API_MODELS = [
     {"id": "claude-opus-5-5", "label": "Claude Opus 5.5", "note": "API key, most capable"},
@@ -188,7 +195,7 @@ def _job(job_id: str) -> Job:
 
 
 def _plan_login() -> str | None:
-    """How Claude Code signs in to the Claude plan here: a token saved on the page, the login of `claude`, or neither."""
+    """How Claude Code signs in to the Claude plan here: a token from `claude setup-token`, the login of `claude`, or neither."""
     if os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"):
         return "token"
     config_dir = Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude")
@@ -196,20 +203,21 @@ def _plan_login() -> str | None:
 
 
 def _default_model() -> str:
-    if LOCAL and _plan_login():
+    if PLAN_ALLOWED and _plan_login():
         return PLAN_MODELS[0]["id"]
     return DEFAULT_MODEL
 
 
 def _models() -> list[dict]:
     """The models a run may use here, the default first."""
-    plan = PLAN_MODELS if LOCAL else []
+    plan = PLAN_MODELS if PLAN_ALLOWED else []
     return plan + API_MODELS if _default_model().startswith(SUBSCRIPTION) else API_MODELS + plan
 
 
 def _connection() -> dict:
     key = os.environ.get("ANTHROPIC_API_KEY", "")
-    return {"local": LOCAL, "plan": _plan_login() if LOCAL else None, "api_key": bool(key), "api_key_end": key[-4:] if key else ""}
+    return {"local": LOCAL, "plan_allowed": PLAN_ALLOWED, "plan": _plan_login() if PLAN_ALLOWED else None,
+            "api_key": bool(key), "api_key_end": key[-4:] if key else ""}
 
 
 def _explain(error: Exception) -> str:
@@ -367,10 +375,12 @@ class ConnectionTest(BaseModel):
 @app.post("/api/connection/test")
 async def test_connection(body: ConnectionTest) -> dict:
     """Make the smallest possible call, so the page can say whether the connection works before a run depends on it."""
-    _local_only()
     if body.via == "plan":
+        if not PLAN_ALLOWED:
+            raise HTTPException(403, "This copy does not run on a Claude plan.")
         if not _plan_login():
-            return {"ok": False, "message": "No Claude plan login on this computer yet. Paste a token from `claude setup-token`."}
+            where = "Paste a token from `claude setup-token`." if LOCAL else "Set CLAUDE_CODE_OAUTH_TOKEN on the host's Environment page."
+            return {"ok": False, "message": f"No Claude plan login here yet. {where}"}
         try:
             await check_connection()
         except RuntimeError as error:

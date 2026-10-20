@@ -42,17 +42,19 @@ The agents run on Claude through the Anthropic API; the default model is Claude 
 
 ## Run it on your computer
 
-You need [uv](https://docs.astral.sh/uv/) and an [Anthropic API key](https://platform.claude.com/settings/keys).
+You need [uv](https://docs.astral.sh/uv/) and one of these:
+
+- **Your Claude Pro or Max plan.** Runs go through Claude Code on your computer and count towards the plan's usage limits. This works only on your own computer, never on a copy that other people can reach.
+- **An [Anthropic API key](https://platform.claude.com/settings/keys)**, billed for each run.
 
 ```bash
 git clone https://github.com/me-shivamo/veda-script-automation.git
 cd veda-script-automation
 uv sync
-cp .env.example .env        # then open .env and paste your Anthropic API key
 uv run python -m web
 ```
 
-Open **http://localhost:8000**. Click **Use the sample book** to try it straight away.
+Open **http://localhost:8000** and click **Claude connection** at the top. For your plan, run `claude setup-token` in a terminal, sign in, and paste the token it prints; if you already use Claude Code on this computer, its login works as it is. Or paste an API key. Both are saved in `.env` on your computer. Click **Use the sample book** to try it straight away.
 
 ## Deploy it on Render
 
@@ -90,7 +92,7 @@ It shows the plan and waits for `y`, `n`, or the change you want. Results go to 
 |---|---|
 | `--request` | What you want, as text or a path to a text file (required) |
 | `--examples` | CSV with a few rows of the output you want (optional, helps a lot) |
-| `--model` | Claude model for all three agents (default `claude-opus-5-5`) |
+| `--model` | Claude model for all three agents (default `claude-opus-5-5`). Put `subscription/` in front, for example `subscription/claude-opus-5-5`, to run on your Claude plan. |
 | `--analyst-model`, `--labeler-model`, `--reviewer-model` | A different model for one agent |
 | `--escalation-model` | A stronger model for parts the Labeler cannot finish |
 | `--spec path/to/spec.json` | Reuse a saved plan and skip the Analyst (for more books in the same series) |
@@ -103,7 +105,8 @@ All settings are environment variables. On your computer, put them in `.env`. On
 
 | Variable | Needed | What it does |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | Yes | Pays for the AI models. |
+| `ANTHROPIC_API_KEY` | Unless you use your Claude plan | Pays for the AI models. On your computer, you can save it on the page instead. |
+| `CLAUDE_CODE_OAUTH_TOKEN` | No | A token from `claude setup-token`, so runs use your Claude plan. Only on your own computer. Without it, Claude Code's own login is used. |
 | `APP_PASSWORD` | On any public copy | When set, the browser asks for a username and password before showing anything. |
 | `APP_USERNAME` | No | The username that goes with it. Default `veda`. |
 | `JOBS_DIR` | No | Folder where runs are kept. Default `./jobs`. On a host, point it at a persistent disk. |

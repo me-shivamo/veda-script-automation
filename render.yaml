@@ -10,7 +10,11 @@ services:
     autoDeployTrigger: commit   # redeploy whenever the deployed branch gets a new commit
     envVars:
       - key: ANTHROPIC_API_KEY
-        sync: false             # Render asks you for this when you create the service
+        sync: false             # Render asks you for this when you create the service; leave it empty to use only your Claude plan
+      - key: CLAUDE_CODE_OAUTH_TOKEN
+        sync: false             # optional: the token from `claude setup-token`, to run on your Claude plan
+      - key: ALLOW_CLAUDE_PLAN
+        sync: false             # set to 1 only if you alone use this copy; Anthropic does not allow a Claude plan to serve others
       - key: APP_USERNAME
         value: veda
       - key: APP_PASSWORD

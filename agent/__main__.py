@@ -36,7 +36,7 @@ def main() -> int:
     run.add_argument("--request", required=True, help="What to extract and in what format: text, or a path to a text file.")
     run.add_argument("--examples", type=Path, help="CSV with a few rows of the output you want (optional but helps a lot).")
     run.add_argument("--spec", type=Path, help="Reuse a saved Spec (spec.json) and skip the Analyst.")
-    run.add_argument("--model", default=DEFAULT_MODEL, help="Claude model for all agents.")
+    run.add_argument("--model", default=DEFAULT_MODEL, help="Claude model for all agents. Prefix subscription/ to run on your Claude plan through Claude Code.")
     run.add_argument("--analyst-model")
     run.add_argument("--labeler-model")
     run.add_argument("--reviewer-model")

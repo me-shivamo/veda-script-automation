@@ -63,7 +63,7 @@ def wait_for(client, run_id, phases, seconds=10):
 
 
 def start(client, **extra):
-    body = {"name": "Tiny Book", "input": BOOK, "request": "one row per mantra", "model": "openai/gpt-6-luna"} | extra
+    body = {"name": "Tiny Book", "input": BOOK, "request": "one row per mantra", "model": "claude-opus-5-5"} | extra
     response = client.post("/api/runs", json=body)
     assert response.status_code == 200, response.text
     return response.json()["id"]
@@ -73,7 +73,7 @@ def test_page_and_config_are_served(client):
     assert "Veda Script Automation" in client.get("/").text
     assert client.get("/static/app.js").status_code == 200
     config = client.get("/api/config").json()
-    assert config["default_model"] == "openai/gpt-6-luna" and config["models"][0]["id"] == config["default_model"]
+    assert config["default_model"] == "claude-opus-5-5" and config["models"][0]["id"] == config["default_model"]
     assert any(sample["id"] == "mandala-brahmana" for sample in config["samples"])
     assert client.get("/api/samples/mandala-brahmana").json()["request"].startswith("This is the Mandala Brahmana")
 
@@ -127,7 +127,7 @@ def test_run_waits_for_approval_then_produces_rows(client):
     assert client.get(f"/api/runs/{run_id}/download/tree").json()["structure"]["unit"] == "mantra"
     assert client.get(f"/api/runs/{run_id}/input").json()["input"] == BOOK
     assert client.get("/api/runs").json()[0] | {"created": 0, "seconds": 0, "cost_usd": 0} == {
-        "id": run_id, "name": "Tiny Book", "model": "openai/gpt-6-luna", "created": 0, "phase": "done", "rows": 3, "cost_usd": 0, "seconds": 0}
+        "id": run_id, "name": "Tiny Book", "model": "claude-opus-5-5", "created": 0, "phase": "done", "rows": 3, "cost_usd": 0, "seconds": 0}
 
 
 def test_feedback_sends_the_plan_back_and_stop_ends_the_run(client):

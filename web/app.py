@@ -14,7 +14,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-from pydantic_ai.exceptions import AgentRunError
+from pydantic_ai.exceptions import AgentRunError, ModelHTTPError
 
 from agent.agents.analyst import AnalystResult
 from agent.agents.models import DEFAULT_MODEL, ModelConfig
@@ -40,14 +40,11 @@ TEMPORARY_STORAGE = bool(os.environ.get("RENDER")) and not os.environ.get("JOBS_
 JOB_ID = re.compile(r"^\d{8}-\d{6}-[a-z0-9-]+$")
 MAX_INPUT_CHARS = 5_000_000
 
-# The default comes first. Only the first two have been tested on real books so far.
+# The default comes first. None has been tested on a real book through the Claude API yet.
 MODELS = [
-    {"id": "openai/gpt-6-luna", "label": "GPT-6 Luna", "note": "tested"},
-    {"id": "openai/gpt-5.6-luna", "label": "GPT-5.6 Luna", "note": "tested"},
-    {"id": "anthropic/claude-haiku-5.5", "label": "Claude Haiku 5.5", "note": "untested"},
-    {"id": "google/gemini-3.8-flash", "label": "Gemini 3.8 Flash", "note": "untested"},
-    {"id": "anthropic/claude-sonnet-5.5", "label": "Claude Sonnet 5.5", "note": "untested, costs more"},
-    {"id": "openai/gpt-5.6-sol", "label": "GPT-5.6 Sol", "note": "untested, costs more"},
+    {"id": "claude-opus-5-5", "label": "Claude Opus 5.5", "note": "most capable"},
+    {"id": "claude-sonnet-5-5", "label": "Claude Sonnet 5.5", "note": "half the price of Opus"},
+    {"id": "claude-haiku-5-5", "label": "Claude Haiku 5.5", "note": "cheapest"},
 ]
 STATE_TO_PHASE = {"DONE": "done", "NEEDS_HUMAN": "needs_review", "STOPPED": "stopped", "FAILED": "failed"}
 ACTIVE = {"starting", "analysing", "awaiting_approval", "labelling", "reviewing", "assembling"}
@@ -179,12 +176,12 @@ def _job(job_id: str) -> Job:
 
 def _explain(error: Exception) -> str:
     text = str(error)
-    if "OPENROUTER_API_KEY" in text:
-        return "The OpenRouter API key is not set. Put OPENROUTER_API_KEY in the .env file and restart the server."
-    if "401" in text or "User not found" in text:
-        return "OpenRouter rejected the API key. Check OPENROUTER_API_KEY in the .env file."
-    if "402" in text or "credits" in text.lower():
-        return "The OpenRouter account is out of credits."
+    if "ANTHROPIC_API_KEY" in text:
+        return "The Anthropic API key is not set. Put ANTHROPIC_API_KEY in the .env file and restart the server."
+    if isinstance(error, ModelHTTPError) and error.status_code == 401:
+        return "Anthropic rejected the API key. Check ANTHROPIC_API_KEY in the .env file."
+    if isinstance(error, ModelHTTPError) and (error.status_code == 402 or "credit balance" in text.lower()):
+        return "The Anthropic account is out of credits. Add credit at platform.claude.com."
     if isinstance(error, AgentRunError):
         return f"An agent could not finish its work: {text[:300]}"
     return f"{type(error).__name__}: {text[:300]}"
@@ -268,7 +265,7 @@ def _card(job: Job) -> dict:
 def config() -> dict:
     samples = [{"id": d.name, "name": d.name.replace("-", " ").title()} for d in sorted(EXAMPLES.glob("*"))
                if (d / "input.md").exists() and (d / "request.txt").exists()]
-    return {"default_model": DEFAULT_MODEL, "models": MODELS, "key_configured": bool(os.environ.get("OPENROUTER_API_KEY")),
+    return {"default_model": DEFAULT_MODEL, "models": MODELS, "key_configured": bool(os.environ.get("ANTHROPIC_API_KEY")),
             "samples": samples, "temporary_storage": TEMPORARY_STORAGE}
 
 

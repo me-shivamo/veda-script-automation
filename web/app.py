@@ -55,6 +55,8 @@ def _plan_allowed(local: bool, allow: str, password: str) -> bool:
 
 
 PLAN_ALLOWED = _plan_allowed(LOCAL, os.environ.get("ALLOW_CLAUDE_PLAN", ""), APP_PASSWORD)
+# Each agent on a Claude plan is a Claude Code process of its own, so a small server runs fewer labelers at once.
+PLAN_CONCURRENCY = int(os.environ.get("PLAN_CONCURRENCY") or (6 if LOCAL else 1))
 # The most capable first. None has been tested on a real book through Claude yet.
 API_MODELS = [
     {"id": "claude-opus-5-5", "label": "Claude Opus 5.5", "note": "API key, most capable"},
@@ -432,7 +434,10 @@ async def start_run(body: NewRun) -> dict:
     job.save_json("meta.json", {"name": body.name.strip() or "book", "model": body.model, "created": time.time()})
     run = Run(job=job)
     RUNS[job.dir.name] = run
-    run.task = asyncio.create_task(_drive(run, RunConfig(models=ModelConfig.all(body.model), auto_approve=not body.ask_approval)))
+    config = RunConfig(models=ModelConfig.all(body.model), auto_approve=not body.ask_approval)
+    if body.model.startswith(SUBSCRIPTION):
+        config.concurrency = PLAN_CONCURRENCY
+    run.task = asyncio.create_task(_drive(run, config))
     return {"id": job.dir.name}
 
 

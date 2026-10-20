@@ -9,7 +9,7 @@ services:
     healthCheckPath: /healthz
     autoDeployTrigger: commit   # redeploy whenever the deployed branch gets a new commit
     envVars:
-      - key: OPENROUTER_API_KEY
+      - key: ANTHROPIC_API_KEY
         sync: false             # Render asks you for this when you create the service
       - key: APP_USERNAME
         value: veda

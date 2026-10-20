@@ -13,7 +13,7 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", "8000")))
     args = parser.parse_args()
     if args.host != "127.0.0.1" and not os.environ.get("APP_PASSWORD"):
-        print("WARNING: other machines can reach this server and APP_PASSWORD is not set. Anyone who can open it can spend your OpenRouter credit.")
+        print("WARNING: other machines can reach this server and APP_PASSWORD is not set. Anyone who can open it can spend your Anthropic credit.")
     print(f"Open http://{'localhost' if args.host == '127.0.0.1' else args.host}:{args.port}", flush=True)
     uvicorn.run("web.app:app", host=args.host, port=args.port, log_level="warning")
 

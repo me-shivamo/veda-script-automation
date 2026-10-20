@@ -44,7 +44,7 @@ The agents run on Claude through the Anthropic API; the default model is Claude 
 
 You need [uv](https://docs.astral.sh/uv/) and one of these:
 
-- **Your Claude Pro or Max plan.** Runs go through Claude Code on your computer and count towards the plan's usage limits. This works only on your own computer, never on a copy that other people can reach.
+- **Your Claude Pro or Max plan.** Runs go through Claude Code on your computer and count towards the plan's usage limits. Anthropic does not allow a plan to serve other people, so a deployed copy uses it only if you alone use that copy (see `ALLOW_CLAUDE_PLAN` below).
 - **An [Anthropic API key](https://platform.claude.com/settings/keys)**, billed for each run.
 
 ```bash
@@ -106,7 +106,8 @@ All settings are environment variables. On your computer, put them in `.env`. On
 | Variable | Needed | What it does |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | Unless you use your Claude plan | Pays for the AI models. On your computer, you can save it on the page instead. |
-| `CLAUDE_CODE_OAUTH_TOKEN` | No | A token from `claude setup-token`, so runs use your Claude plan. Only on your own computer. Without it, Claude Code's own login is used. |
+| `CLAUDE_CODE_OAUTH_TOKEN` | No | A token from `claude setup-token`, so runs use your Claude plan. On your computer, Claude Code's own login works too. |
+| `ALLOW_CLAUDE_PLAN` | No | Set to `1` on a deployed copy that you alone use, so it may run on your Claude plan. Needs `APP_PASSWORD`. |
 | `APP_PASSWORD` | On any public copy | When set, the browser asks for a username and password before showing anything. |
 | `APP_USERNAME` | No | The username that goes with it. Default `veda`. |
 | `JOBS_DIR` | No | Folder where runs are kept. Default `./jobs`. On a host, point it at a persistent disk. |

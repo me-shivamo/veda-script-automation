@@ -422,6 +422,18 @@ On the free plan, a redeploy clears the saved runs.
 
 Open the service's **Environment** page, replace the value of `ANTHROPIC_API_KEY`, and save. Do this whenever a key may have been seen by someone who should not have it.
 
+### Running on your Claude plan, if you alone use the copy
+
+Anthropic does not allow a Claude Pro or Max plan to power a service for other people. If you are the only person who ever uses the deployed copy, it can run on your plan instead of an API key:
+
+1. On your computer, run `claude setup-token`, sign in, and copy the token it prints.
+2. On the service's **Environment** page, set `CLAUDE_CODE_OAUTH_TOKEN` to the token and `ALLOW_CLAUDE_PLAN` to `1`. Keep `APP_PASSWORD` set: without it the plan stays off.
+3. Save. After the restart, open **Claude connection** on the page and click **Test the connection**.
+
+Never share the password of a copy that runs on your plan.
+
+Each agent on the plan runs as a Claude Code process of its own, of about 230 MB, next to about 150 MB for the app. So plan runs on a hosted copy run one labeler at a time (`PLAN_CONCURRENCY`). Even so, the Analyst's trial run briefly needs two processes, which is more than the free instance's 512 MB: expect plan runs on the free instance to stop with the instance restarting. An instance with 2 GB runs them, and with `PLAN_CONCURRENCY` set to 4 it is faster. Check [Render's pricing page](https://render.com/pricing) for current prices.
+
 ### Why these choices were made
 
 - **Docker.** The Dockerfile pins the Python version and installs the exact package versions recorded in `uv.lock`, so the deployed app is the same as the tested one.
@@ -438,7 +450,9 @@ All settings are environment variables. On your computer they go in the `.env` f
 | Variable | Default | What it does |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | none | The key that pays for the AI models. Needed on Render. On your computer, you can save it on the page instead, or use your Claude plan. |
-| `CLAUDE_CODE_OAUTH_TOKEN` | none | A token from `claude setup-token`, so runs use your Claude Pro or Max plan through Claude Code. Only on a copy running on your own computer. Without it, Claude Code's own login is used. |
+| `CLAUDE_CODE_OAUTH_TOKEN` | none | A token from `claude setup-token`, so runs use your Claude Pro or Max plan through Claude Code. On your computer, you can save it on the page instead, or rely on Claude Code's own login. |
+| `ALLOW_CLAUDE_PLAN` | empty | Set to `1` on a hosted copy that you alone use, to let it run on your Claude plan. Works only with `APP_PASSWORD` set. Not needed on your own computer. |
+| `PLAN_CONCURRENCY` | `6` on your computer, `1` on a host | How many labelers run at once on the Claude plan. Each is a Claude Code process of about 230 MB. |
 | `APP_PASSWORD` | empty | When set, every page and every request asks for the username and password. When empty, there is no sign-in at all. |
 | `APP_USERNAME` | `veda` | The username that goes with `APP_PASSWORD`. |
 | `JOBS_DIR` | `./jobs` | The folder where runs are kept. |

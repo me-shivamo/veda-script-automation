@@ -34,18 +34,21 @@ class Usage:
     by_agent: dict = field(default_factory=dict)
 
     def add(self, agent: str, model_id: str, run_usage, price: tuple[float, float] | None = None) -> None:
-        cost = getattr(run_usage, "cost", None)
-        if not cost and price:
-            cost = (run_usage.input_tokens * price[0] + run_usage.output_tokens * price[1]) / 1_000_000
-        cost = float(cost or 0)
+        cost = 0.0
+        if price:
+            # input_tokens includes the cached tokens: a cache write costs 1.25 times the input price, a read 0.1 times.
+            written, read = run_usage.cache_write_tokens, run_usage.cache_read_tokens
+            fresh = run_usage.input_tokens - written - read
+            cost = ((fresh + 1.25 * written + 0.1 * read) * price[0] + run_usage.output_tokens * price[1]) / 1_000_000
         self.requests += run_usage.requests
         self.input_tokens += run_usage.input_tokens
         self.output_tokens += run_usage.output_tokens
         self.cost += cost
-        row = self.by_agent.setdefault(f"{agent} ({model_id})", {"runs": 0, "requests": 0, "input_tokens": 0, "output_tokens": 0, "cost": 0.0})
+        row = self.by_agent.setdefault(f"{agent} ({model_id})", {"runs": 0, "requests": 0, "input_tokens": 0, "cache_read_tokens": 0, "output_tokens": 0, "cost": 0.0})
         row["runs"] += 1
         row["requests"] += run_usage.requests
         row["input_tokens"] += run_usage.input_tokens
+        row["cache_read_tokens"] += run_usage.cache_read_tokens
         row["output_tokens"] += run_usage.output_tokens
         row["cost"] = round(row["cost"] + cost, 6)
 

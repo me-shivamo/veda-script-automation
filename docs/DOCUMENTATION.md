@@ -118,7 +118,9 @@ A Labeler has to fix a failed check, or flag the pieces with a reason. Flagged p
 ### What you need
 
 - **uv**, which installs Python and the packages. Install it from [docs.astral.sh/uv](https://docs.astral.sh/uv/).
-- **An Anthropic API key.** Anthropic runs the Claude models the agents use. Create a key at [platform.claude.com/settings/keys](https://platform.claude.com/settings/keys) and add some credit under Billing.
+- **A way to reach Claude**, one of:
+  - **Your Claude Pro or Max plan.** Runs go through Claude Code on your computer and count towards the plan's usage limits, so you pay nothing extra. This works only on a copy running on your own computer: Anthropic does not allow a claude.ai login to power a service for other people.
+  - **An Anthropic API key**, billed for each run. Create one at [platform.claude.com/settings/keys](https://platform.claude.com/settings/keys) and add some credit under Billing.
 
 ### Set it up
 
@@ -126,10 +128,7 @@ A Labeler has to fix a failed check, or flag the pieces with a reason. Flagged p
 git clone https://github.com/me-shivamo/veda-script-automation.git
 cd veda-script-automation
 uv sync
-cp .env.example .env
 ```
-
-Open the new `.env` file and paste your key after `ANTHROPIC_API_KEY=`. This file stays on your computer and is never uploaded to GitHub.
 
 ### Start it
 
@@ -138,6 +137,15 @@ uv run python -m web
 ```
 
 Open **http://localhost:8000** in your browser. To stop the server, press `Ctrl+C` in the terminal.
+
+### Connect Claude
+
+Click **Claude connection** at the top of the page. You do this once; the page remembers it.
+
+- **Your Claude plan.** Open a terminal and run `claude setup-token`. Sign in to claude.ai in the browser window it opens, copy the token it prints (it starts with `sk-ant-oat`), paste it on the page and click **Save**. The page then asks Claude for a one-word reply to check that it works. If you already use Claude Code on this computer, you can skip the token: its login is used.
+- **An API key.** Paste it in the second box and click **Save**.
+
+Both are saved in the `.env` file, which stays on your computer and is never uploaded to GitHub. When a token or key is saved, the model list on the request form shows which models run on your plan and which on the API key. The plan's models come first.
 
 To try it without your own book, click **Use the sample book** on the page.
 
@@ -429,7 +437,8 @@ All settings are environment variables. On your computer they go in the `.env` f
 
 | Variable | Default | What it does |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | none (required) | The key that pays for the AI models. Without it the page shows a warning and runs fail. |
+| `ANTHROPIC_API_KEY` | none | The key that pays for the AI models. Needed on Render. On your computer, you can save it on the page instead, or use your Claude plan. |
+| `CLAUDE_CODE_OAUTH_TOKEN` | none | A token from `claude setup-token`, so runs use your Claude Pro or Max plan through Claude Code. Only on a copy running on your own computer. Without it, Claude Code's own login is used. |
 | `APP_PASSWORD` | empty | When set, every page and every request asks for the username and password. When empty, there is no sign-in at all. |
 | `APP_USERNAME` | `veda` | The username that goes with `APP_PASSWORD`. |
 | `JOBS_DIR` | `./jobs` | The folder where runs are kept. |
@@ -456,7 +465,7 @@ uv run python -m agent run BOOK.md --request "what you want" [options]
 |---|---|
 | `--request` | What you want, as text or a path to a text file. Required. |
 | `--examples FILE.csv` | A few rows of the output you want. |
-| `--model ID` | Claude model for all three agents. Default `claude-opus-5-5`. |
+| `--model ID` | Claude model for all three agents. Default `claude-opus-5-5`. Put `subscription/` in front, for example `subscription/claude-opus-5-5`, to run on your Claude plan through Claude Code. |
 | `--analyst-model`, `--labeler-model`, `--reviewer-model` | A different model for one agent. |
 | `--escalation-model ID` | A stronger model that retries any part the Labeler could not finish. |
 | `--effort` | How hard the model thinks: `minimal`, `low`, `medium` (default), `high`, `xhigh`. |
@@ -562,6 +571,7 @@ agent/
     analyst.py, labeler.py, reviewer.py   Each agent and its tools
     deps.py            Shared state: pieces, labels, usage, trace
     models.py          Which model each agent uses, through the Claude API
+    subscription.py    Runs an agent on a Claude plan through Claude Code instead
   orchestrator.py    Runs one book from start to finish
   jobs.py            One folder per run
   plan.py            The plan screen's data: outline, kinds of text, previews in every shape, what changed
@@ -637,7 +647,7 @@ When a run makes a mistake, the most durable fix has been a new check in `assemb
 
 ### Adding a model to the page
 
-Edit the `MODELS` list in `web/app.py`. Any Claude model can be listed; add its prices to `PRICES` in `agent/agents/models.py` so runs show their cost. Test it with `eval.bakeoff` first.
+Edit the `API_MODELS` and `PLAN_MODELS` lists in `web/app.py`. Any Claude model can be listed; add its prices to `PRICES` in `agent/agents/models.py` so runs show their cost. Test it with `eval.bakeoff` first.
 
 ### The web server's addresses
 

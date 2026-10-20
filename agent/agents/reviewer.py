@@ -13,7 +13,7 @@ from ..core.pieces import split_piece as split_piece_in
 from ..core.spec import Spec, render_spec
 from ..core.view import render_issues, render_pieces, render_records
 from .deps import Workspace
-from .models import make_model, model_settings, price
+from .models import close_model, make_model, model_settings, price
 
 
 @dataclass
@@ -175,14 +175,17 @@ async def clear_flag(ctx: RunContext[ReviewDeps], piece_ids: list[str]) -> str:
 async def run_reviewer(deps: ReviewDeps, model_id: str, effort: str, request_limit: int = 40) -> str:
     """Run the Reviewer. Never raises for model failures; returns its summary or the reason it stopped."""
     usage = RunUsage()
+    model = make_model(model_id)
     try:
         result = await reviewer.run(
-            "Code has assembled the book and found problems. Start with `list_issues`.", deps=deps, model=make_model(model_id),
+            "Code has assembled the book and found problems. Start with `list_issues`.", deps=deps, model=model,
             model_settings=model_settings(effort), usage_limits=UsageLimits(request_limit=request_limit), usage=usage,
         )
         summary = result.output.summary
     except AgentRunError as e:
         summary = f"did not finish: {type(e).__name__}: {e}"
+    finally:
+        await close_model(model)
     deps.ws.usage.add("reviewer", model_id, usage, price(model_id))
     deps.ws.trace.log("reviewer", "book", "run_end", {"model": model_id, "requests": usage.requests}, summary)
     return summary

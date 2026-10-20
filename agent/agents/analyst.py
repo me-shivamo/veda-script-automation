@@ -14,7 +14,7 @@ from ..core.view import render_issues, render_pieces, render_records
 from ..plan import OutlineItem, Trial, describe_plan, plan_view
 from .deps import Workspace
 from .labeler import ChunkDeps, run_labeler
-from .models import ModelConfig, make_model, model_settings, price
+from .models import ModelConfig, close_model, make_model, model_settings, price
 
 MAX_TRIALS = 3
 MAX_PAGES_PER_READ = 6
@@ -212,12 +212,14 @@ def analyst_prompt(deps: AnalystDeps, feedback: str = "", previous: Spec | None 
 async def run_analyst(deps: AnalystDeps, feedback: str = "", previous: Spec | None = None, request_limit: int = 40) -> AnalystResult:
     """Run the Analyst. Raises AgentRunError if it cannot produce a Spec."""
     usage = RunUsage()
+    model = make_model(deps.models.analyst)
     try:
         result = await analyst.run(
-            analyst_prompt(deps, feedback, previous), deps=deps, model=make_model(deps.models.analyst),
+            analyst_prompt(deps, feedback, previous), deps=deps, model=model,
             model_settings=model_settings(deps.models.effort), usage_limits=UsageLimits(request_limit=request_limit), usage=usage,
         )
     finally:
+        await close_model(model)
         deps.ws.usage.add("analyst", deps.models.analyst, usage, price(deps.models.analyst))
     return result.output
 

@@ -1,4 +1,4 @@
-"""Which model each agent runs on, through the Claude API."""
+"""Which model each agent runs on: through the Claude API, or on a Claude plan through Claude Code (see subscription.py)."""
 
 import os
 from dataclasses import dataclass
@@ -6,8 +6,11 @@ from functools import lru_cache
 
 from anthropic import AsyncAnthropic
 from dotenv import load_dotenv
+from pydantic_ai.models import Model
 from pydantic_ai.models.anthropic import AnthropicModel, AnthropicModelSettings
 from pydantic_ai.providers.anthropic import AnthropicProvider
+
+from .subscription import PREFIX as SUBSCRIPTION, SubscriptionModel
 
 load_dotenv()
 os.environ.setdefault("PYDANTIC_AI_NO_BANNER", "1")
@@ -36,8 +39,20 @@ class ModelConfig:
         return cls(analyst=model_id, labeler=model_id, reviewer=model_id, **kwargs)
 
 
+def make_model(model_id: str) -> Model:
+    """The model for one agent run. Pass it to close_model when the run ends."""
+    if model_id.startswith(SUBSCRIPTION):
+        return SubscriptionModel(model_id.removeprefix(SUBSCRIPTION))
+    return api_model(model_id)
+
+
+async def close_model(model: Model) -> None:
+    if isinstance(model, SubscriptionModel):
+        await model.close()
+
+
 @lru_cache(maxsize=None)
-def make_model(model_id: str) -> AnthropicModel:
+def api_model(model_id: str) -> AnthropicModel:
     key = os.environ.get("ANTHROPIC_API_KEY")
     if not key:
         raise RuntimeError("ANTHROPIC_API_KEY is not set. Put it in the .env file at the project root.")
@@ -57,5 +72,5 @@ def model_settings(effort: str) -> AnthropicModelSettings:
 
 
 def price(model_id: str) -> tuple[float, float] | None:
-    """(input, output) dollars per million tokens, or None for a model not in the table."""
+    """(input, output) dollars per million tokens, or None for a model not in the table or one run on a Claude plan."""
     return PRICES.get(model_id)

@@ -14,7 +14,7 @@ from ..core.pieces import Piece, split_piece as split_piece_in
 from ..core.spec import Spec, render_spec
 from ..core.view import render_issues, render_pieces, render_records
 from .deps import Workspace
-from .models import make_model, model_settings, price
+from .models import close_model, make_model, model_settings, price
 
 CONTEXT_PIECES = 25
 
@@ -159,14 +159,17 @@ class ChunkOutcome:
 async def run_labeler(deps: ChunkDeps, model_id: str, effort: str, request_limit: int = 30) -> ChunkOutcome:
     """Run the Labeler on one chunk. Never raises for model failures; reports them in the outcome."""
     usage = RunUsage()
+    model = make_model(model_id)
     try:
         result = await labeler.run(
-            chunk_prompt(deps), deps=deps, model=make_model(model_id), model_settings=model_settings(effort),
+            chunk_prompt(deps), deps=deps, model=model, model_settings=model_settings(effort),
             usage_limits=UsageLimits(request_limit=request_limit), usage=usage,
         )
         summary = result.output.summary
     except AgentRunError as e:
         summary = f"did not finish: {type(e).__name__}: {e}"
+    finally:
+        await close_model(model)
     deps.ws.usage.add("labeler", model_id, usage, price(model_id))
     errors = len(deps.check().errors)
     ok = errors == 0 and not summary.startswith("did not finish")

@@ -95,6 +95,7 @@ def settings(monkeypatch, tmp_path):
     monkeypatch.setattr(os, "environ", env)
     monkeypatch.setattr(web, "ENV_FILE", tmp_path / ".env")
     monkeypatch.setattr(web, "LOCAL", True)
+    monkeypatch.setattr(web, "PLAN_ALLOWED", True)
     return TestClient(web.app)
 
 
@@ -121,12 +122,29 @@ def test_the_page_saves_an_api_key_and_shows_only_its_end(settings, tmp_path):
     refused = settings.post("/api/connection", json={"api_key": "sk-ant-oat01-abc"})
     assert refused.status_code == 422 and "Claude plan" in refused.json()["detail"]
     saved = settings.post("/api/connection", json={"api_key": "sk-ant-api03-secret-wxyz"}).json()
-    assert saved == {"local": True, "plan": None, "api_key": True, "api_key_end": "wxyz"}
+    assert saved == {"local": True, "plan_allowed": True, "plan": None, "api_key": True, "api_key_end": "wxyz"}
     assert "secret" not in settings.get("/api/config").text
+
+
+def test_a_hosted_copy_its_owner_alone_uses_runs_on_the_plan_from_its_settings(settings, monkeypatch):
+    monkeypatch.setattr(web, "LOCAL", False)
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "sk-ant-oat01-abc")
+    config = settings.get("/api/config").json()
+    assert config["default_model"] == "subscription/claude-opus-5-5" and config["connection"]["plan"] == "token"
+    # The token comes from the host's settings; the page cannot change it there.
+    assert settings.post("/api/connection", json={"plan_token": "sk-ant-oat01-xyz"}).status_code == 403
+
+
+def test_the_plan_needs_this_computer_or_an_owner_only_copy_with_a_password():
+    assert web._plan_allowed(True, "", "")
+    assert not web._plan_allowed(False, "", "secret")
+    assert not web._plan_allowed(False, "1", "")
+    assert web._plan_allowed(False, "1", "secret")
 
 
 def test_a_copy_others_can_reach_never_uses_a_claude_plan(settings, monkeypatch):
     monkeypatch.setattr(web, "LOCAL", False)
+    monkeypatch.setattr(web, "PLAN_ALLOWED", False)
     assert settings.post("/api/connection", json={"plan_token": "sk-ant-oat01-abc"}).status_code == 403
     assert settings.post("/api/connection/test", json={"via": "plan"}).status_code == 403
     config = settings.get("/api/config").json()

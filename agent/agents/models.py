@@ -1,19 +1,26 @@
-"""Which model each agent runs on, through OpenRouter."""
+"""Which model each agent runs on, through the Claude API."""
 
-import json
 import os
-import urllib.request
 from dataclasses import dataclass
 from functools import lru_cache
 
+from anthropic import AsyncAnthropic
 from dotenv import load_dotenv
-from pydantic_ai.models.openrouter import OpenRouterModel, OpenRouterModelSettings
-from pydantic_ai.providers.openrouter import OpenRouterProvider
+from pydantic_ai.models.anthropic import AnthropicModel, AnthropicModelSettings
+from pydantic_ai.providers.anthropic import AnthropicProvider
 
 load_dotenv()
 os.environ.setdefault("PYDANTIC_AI_NO_BANNER", "1")
 
-DEFAULT_MODEL = "openai/gpt-6-luna"
+DEFAULT_MODEL = "claude-opus-5-5"
+
+# Dollars per million tokens: (input, output). Anthropic's list prices; Haiku's are for prompts up to 100K tokens.
+PRICES = {
+    "claude-opus-5-5": (4.00, 20.00),
+    "claude-sonnet-5-5": (2.00, 10.00),
+    "claude-haiku-5-5": (0.10, 0.50),
+    "claude-fable-5-1": (10.00, 50.00),
+}
 
 
 @dataclass
@@ -30,32 +37,25 @@ class ModelConfig:
 
 
 @lru_cache(maxsize=None)
-def make_model(model_id: str) -> OpenRouterModel:
-    key = os.environ.get("OPENROUTER_API_KEY")
+def make_model(model_id: str) -> AnthropicModel:
+    key = os.environ.get("ANTHROPIC_API_KEY")
     if not key:
-        raise RuntimeError("OPENROUTER_API_KEY is not set. Put it in the .env file at the project root.")
-    return OpenRouterModel(model_id, provider=OpenRouterProvider(api_key=key, app_title="veda-script-automation"))
+        raise RuntimeError("ANTHROPIC_API_KEY is not set. Put it in the .env file at the project root.")
+    # Several labelers run at once, so allow more retries than the SDK's two for rate limits and overloads.
+    client = AsyncAnthropic(api_key=key, max_retries=5)
+    return AnthropicModel(model_id, provider=AnthropicProvider(anthropic_client=client))
 
 
-def model_settings(effort: str) -> OpenRouterModelSettings:
-    return OpenRouterModelSettings(
-        openrouter_usage={"include": True},
-        # Only route to providers that support tool calling and the other parameters we send.
-        openrouter_provider={"require_parameters": True},
-        openrouter_reasoning={"effort": effort},
+def model_settings(effort: str) -> AnthropicModelSettings:
+    return AnthropicModelSettings(
+        anthropic_effort=effort,
+        # Every agent turn resends the whole conversation: cache the instructions and tools, which parallel
+        # labelers share, and the growing history, so later turns read it at a tenth of the price.
+        anthropic_cache_instructions=True,
+        anthropic_cache=True,
     )
 
 
-@lru_cache(maxsize=1)
-def _price_table() -> dict[str, tuple[float, float]]:
-    try:
-        with urllib.request.urlopen("https://openrouter.ai/api/v1/models", timeout=20) as response:
-            data = json.load(response)["data"]
-        return {m["id"]: (float(m["pricing"]["prompt"]) * 1e6, float(m["pricing"]["completion"]) * 1e6) for m in data}
-    except Exception:
-        return {}
-
-
 def price(model_id: str) -> tuple[float, float] | None:
-    """(input, output) dollars per million tokens; a fallback for when a response carries no cost."""
-    return _price_table().get(model_id)
+    """(input, output) dollars per million tokens, or None for a model not in the table."""
+    return PRICES.get(model_id)

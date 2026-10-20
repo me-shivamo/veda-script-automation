@@ -38,17 +38,17 @@ You get:
 - a **To review** list: the few places a person should check
 - a **Lines left out** list: every line removed from the output, such as page headers and footnotes. Everything else is the book text exactly as printed, character for character, and code proves this on every run.
 
-On the sample book (28 pages, 89 mantras) with the default GPT-6 Luna model, a run takes 3–4 minutes and costs about 4 US cents. GPT-5.6 Luna gives the same rows for about 8 cents. On 24 pages of the Chandogya Upanishad, whose OCR prints the root text out of order, a run takes about 5 minutes and 5 cents.
+The agents run on Claude through the Anthropic API; the default model is Claude Opus 5.5. Before the switch to Claude, runs used GPT-6 Luna through OpenRouter: on the sample book (28 pages, 89 mantras) a run took 3–4 minutes, and on 24 pages of the Chandogya Upanishad, whose OCR prints the root text out of order, about 5 minutes. Time and cost on Claude have not been measured yet.
 
 ## Run it on your computer
 
-You need [uv](https://docs.astral.sh/uv/) and an [OpenRouter](https://openrouter.ai/keys) API key.
+You need [uv](https://docs.astral.sh/uv/) and an [Anthropic API key](https://platform.claude.com/settings/keys).
 
 ```bash
 git clone https://github.com/me-shivamo/veda-script-automation.git
 cd veda-script-automation
 uv sync
-cp .env.example .env        # then open .env and paste your OpenRouter key
+cp .env.example .env        # then open .env and paste your Anthropic API key
 uv run python -m web
 ```
 
@@ -63,7 +63,7 @@ The repository includes everything Render needs: [render.yaml](render.yaml) and 
 
    [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/me-shivamo/veda-script-automation)
 
-3. Render asks for **`OPENROUTER_API_KEY`**. Paste your key and start the deploy.
+3. Render asks for **`ANTHROPIC_API_KEY`**. Paste your key and start the deploy.
 4. Wait for the first build to finish. It takes a few minutes.
 5. On the service's **Environment** page, reveal **`APP_PASSWORD`**. Render created it for you.
 6. Open the service's address. The browser asks for a username and password. The username is `veda`; the password is the one from step 5.
@@ -72,7 +72,7 @@ Three things to know before you rely on it:
 
 - **The free plan forgets its runs unless you connect a database.** Its files are wiped whenever the service restarts, redeploys, or sleeps after 15 minutes without visitors. Set `DATABASE_URL` to a free [Neon](https://neon.com) Postgres database and every run is kept. See [Keeping runs permanently](docs/DOCUMENTATION.md#keeping-runs-permanently).
 - **The first visit after a sleep takes about a minute** while Render wakes the service.
-- **Everyone shares one password.** Anyone who has it can start runs, and runs spend your OpenRouter credit.
+- **Everyone shares one password.** Anyone who has it can start runs, and runs spend your Anthropic credit.
 
 Step-by-step instructions, the paid setup and troubleshooting: **[Deploying on Render](docs/DOCUMENTATION.md#7-deploying-on-render)**.
 
@@ -90,7 +90,7 @@ It shows the plan and waits for `y`, `n`, or the change you want. Results go to 
 |---|---|
 | `--request` | What you want, as text or a path to a text file (required) |
 | `--examples` | CSV with a few rows of the output you want (optional, helps a lot) |
-| `--model` | OpenRouter model for all three agents (default `openai/gpt-6-luna`) |
+| `--model` | Claude model for all three agents (default `claude-opus-5-5`) |
 | `--analyst-model`, `--labeler-model`, `--reviewer-model` | A different model for one agent |
 | `--escalation-model` | A stronger model for parts the Labeler cannot finish |
 | `--spec path/to/spec.json` | Reuse a saved plan and skip the Analyst (for more books in the same series) |
@@ -103,7 +103,7 @@ All settings are environment variables. On your computer, put them in `.env`. On
 
 | Variable | Needed | What it does |
 |---|---|---|
-| `OPENROUTER_API_KEY` | Yes | Pays for the AI models. |
+| `ANTHROPIC_API_KEY` | Yes | Pays for the AI models. |
 | `APP_PASSWORD` | On any public copy | When set, the browser asks for a username and password before showing anything. |
 | `APP_USERNAME` | No | The username that goes with it. Default `veda`. |
 | `JOBS_DIR` | No | Folder where runs are kept. Default `./jobs`. On a host, point it at a persistent disk. |
@@ -122,7 +122,7 @@ uv run pytest
 To score real runs against a book's expected output:
 
 ```bash
-uv run python -m eval.bakeoff --book examples/mandala-brahmana --models openai/gpt-6-luna --repeat 3
+uv run python -m eval.bakeoff --book examples/mandala-brahmana --models claude-opus-5-5 --repeat 3
 ```
 
 ## Project layout
@@ -148,10 +148,10 @@ Dockerfile, render.yaml    Deployment on Render
 
 ## Current limits
 
-- **Tested on two books.** The figures above are for the sample book with GPT-6 Luna and GPT-5.6 Luna, and 24 pages of the Chandogya Upanishad with GPT-6 Luna. Books with four or five levels of sections are handled by the code and its tests, but no real one has been run yet.
+- **Tested on two books, before the switch to Claude.** The figures above are for the sample book with GPT-6 Luna and GPT-5.6 Luna, and 24 pages of the Chandogya Upanishad with GPT-6 Luna. The Claude models have not yet been scored on them. Books with four or five levels of sections are handled by the code and its tests, but no real one has been run yet.
 - **Text scrambled inside one unit is not reordered.** If the OCR reads the second half of a mantra before the first, the output keeps the OCR order and lists it for review.
 - **Units must be numbered in the book**, with the number after each shloka, mantra or sutra (`॥ ५ ॥`). Unnumbered prose is not supported yet.
 - **Fixes are not made in the page yet.** The review list tells you what to check; you correct the downloaded file yourself.
 - **Footnotes** can be kept or dropped as a whole, but are not linked to the word they annotate.
 - **Duplicated pages** in the OCR are reported, not removed.
-- **The book text is sent to OpenRouter** and to the model provider you choose. Do not load texts you are not allowed to share.
+- **The book text is sent to Anthropic**, which runs the Claude models. Do not load texts you are not allowed to share.

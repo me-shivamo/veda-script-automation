@@ -118,7 +118,7 @@ A Labeler has to fix a failed check, or flag the pieces with a reason. Flagged p
 ### What you need
 
 - **uv**, which installs Python and the packages. Install it from [docs.astral.sh/uv](https://docs.astral.sh/uv/).
-- **An OpenRouter API key.** OpenRouter is the service that gives access to the AI models. Create a key at [openrouter.ai/keys](https://openrouter.ai/keys) and add a few dollars of credit.
+- **An Anthropic API key.** Anthropic runs the Claude models the agents use. Create a key at [platform.claude.com/settings/keys](https://platform.claude.com/settings/keys) and add some credit under Billing.
 
 ### Set it up
 
@@ -129,7 +129,7 @@ uv sync
 cp .env.example .env
 ```
 
-Open the new `.env` file and paste your key after `OPENROUTER_API_KEY=`. This file stays on your computer and is never uploaded to GitHub.
+Open the new `.env` file and paste your key after `ANTHROPIC_API_KEY=`. This file stays on your computer and is never uploaded to GitHub.
 
 ### Start it
 
@@ -170,7 +170,7 @@ The other fields:
 - **Example rows (optional).** A few rows of the output you want, as CSV. This is the most useful thing you can give the agents.
 - **The output file (optional).** The shape (table, blocks or tree), the row ID (`1.3.5` or a column per level), where section titles and closing lines go, and the columns in order. Leave any of these to the AI; you can also change them on the plan.
 - **Name of this run.** How the run appears in the list, and the name of the downloaded files.
-- **Model.** GPT-6 Luna is the default. It and GPT-5.6 Luna are the two tested models.
+- **Model.** Claude Opus 5.5 is the default and the most capable. Claude Sonnet 5.5 costs half as much, and Claude Haiku 5.5 a small fraction. None of them has been scored on the test books yet.
 - **Show me the plan before the full run.** Leave this ticked unless you have already run the same kind of book and trust the result.
 
 **Back** returns to the book without losing anything. Click **Read the book and show me the plan**.
@@ -276,7 +276,7 @@ Apart from these lines, every character in the output is exactly as in the text 
 
 ### How reliable is it?
 
-The tool has been measured on two books with the GPT-6 Luna model:
+The tool was measured on two books with the GPT-6 Luna model, through OpenRouter, before it moved to Claude. The Claude models have not been measured yet:
 
 - **The Mandala Brahmana Upanishad sample** (28 pages, 89 mantras, page headers that name the section). Runs since 12 October have matched all 50 rows that have an expected answer exactly, except for a few rows in individual runs, each of which led to a new check. The latest run, on 17 October with the code described here, matched 50 of 50.
 - **24 pages of the Chandogya Upanishad** with its commentary and the editor's footnotes (adhyaya → khanda → mantra, a location header on every page, and OCR that prints the boxed mantras out of order). Before the changes of 17 October, every row was numbered two khandas too low and five mantras lost their root text. Now all 46 mantras are placed 1.3.3 to 1.9.1, each with its root text, in about 6 minutes for 6 to 8 cents. The review list points to the places where the OCR itself is broken.
@@ -295,7 +295,7 @@ You need:
 
 - a GitHub account with this repository in it
 - a Render account (sign up at [render.com](https://render.com); signing in with GitHub is the easiest)
-- your OpenRouter API key
+- your Anthropic API key
 
 The repository already contains the two files Render uses:
 
@@ -310,7 +310,7 @@ The repository already contains the two files Render uses:
    - If the repository does not appear, click the link to configure GitHub access and allow Render to see it. A private repository needs this step.
    - You can also use this direct link: `https://render.com/deploy?repo=https://github.com/me-shivamo/veda-script-automation`
 
-3. **Enter the API key.** Render reads `render.yaml` and shows what it will create. It asks for a value for `OPENROUTER_API_KEY`. Paste your OpenRouter key.
+3. **Enter the API key.** Render reads `render.yaml` and shows what it will create. It asks for a value for `ANTHROPIC_API_KEY`. Paste your Anthropic key.
 
 4. **Deploy.** Confirm, and wait. The first build takes a few minutes. The service is ready when its status shows **Live**.
 
@@ -325,7 +325,7 @@ The repository already contains the two files Render uses:
 The generated password is long and hard to type. To set your own:
 
 1. Open the service's **Environment** page.
-2. Change `APP_PASSWORD` to a password of your choice. Use a long one; it protects your OpenRouter credit.
+2. Change `APP_PASSWORD` to a password of your choice. Use a long one; it protects your Anthropic credit.
 3. Save. Render restarts the service with the new password.
 
 You can change `APP_USERNAME` the same way.
@@ -383,7 +383,7 @@ services:
       mountPath: /var/data
       sizeGB: 1
     envVars:
-      - key: OPENROUTER_API_KEY
+      - key: ANTHROPIC_API_KEY
         sync: false
       - key: APP_USERNAME
         value: veda
@@ -410,9 +410,9 @@ Check [Render's pricing page](https://render.com/pricing) for current prices.
 
 On the free plan, a redeploy clears the saved runs.
 
-### Changing the OpenRouter key
+### Changing the Anthropic key
 
-Open the service's **Environment** page, replace the value of `OPENROUTER_API_KEY`, and save. Do this whenever a key may have been seen by someone who should not have it.
+Open the service's **Environment** page, replace the value of `ANTHROPIC_API_KEY`, and save. Do this whenever a key may have been seen by someone who should not have it.
 
 ### Why these choices were made
 
@@ -429,7 +429,7 @@ All settings are environment variables. On your computer they go in the `.env` f
 
 | Variable | Default | What it does |
 |---|---|---|
-| `OPENROUTER_API_KEY` | none (required) | The key that pays for the AI models. Without it the page shows a warning and runs fail. |
+| `ANTHROPIC_API_KEY` | none (required) | The key that pays for the AI models. Without it the page shows a warning and runs fail. |
 | `APP_PASSWORD` | empty | When set, every page and every request asks for the username and password. When empty, there is no sign-in at all. |
 | `APP_USERNAME` | `veda` | The username that goes with `APP_PASSWORD`. |
 | `JOBS_DIR` | `./jobs` | The folder where runs are kept. |
@@ -456,7 +456,7 @@ uv run python -m agent run BOOK.md --request "what you want" [options]
 |---|---|
 | `--request` | What you want, as text or a path to a text file. Required. |
 | `--examples FILE.csv` | A few rows of the output you want. |
-| `--model ID` | OpenRouter model for all three agents. Default `openai/gpt-6-luna`. |
+| `--model ID` | Claude model for all three agents. Default `claude-opus-5-5`. |
 | `--analyst-model`, `--labeler-model`, `--reviewer-model` | A different model for one agent. |
 | `--escalation-model ID` | A stronger model that retries any part the Labeler could not finish. |
 | `--effort` | How hard the model thinks: `minimal`, `low`, `medium` (default), `high`, `xhigh`. |
@@ -492,15 +492,15 @@ Each run gets its own folder under `jobs/`, named with the date, time and run na
 
 There are two separate costs.
 
-**AI models (OpenRouter).** You pay for what the models read and write. On the 28-page sample book, a run cost about 4 US cents with GPT-6 Luna (the default) and 6 to 9 cents with GPT-5.6 Luna. Cost grows roughly with the number of pages. Other models have not been tested here, and some cost many times more per run.
+**AI models (Anthropic).** You pay for what the models read and write. Per million tokens, Claude Opus 5.5 costs $4 to read and $20 to write, Claude Sonnet 5.5 $2 and $10, and Claude Haiku 5.5 $0.10 and $0.50. A run of the 28-page sample book reads about a million tokens. Most of that is the agents' own conversation sent again on each step, which prompt caching bills at a tenth of the price. Cost grows roughly with the number of pages. The cost of a run on Claude has not been measured yet.
 
-Every finished run shows its cost on the page and in `state.json`. Your OpenRouter dashboard shows the total.
+Every finished run shows its cost on the page and in `state.json`, worked out from Anthropic's list prices. The Anthropic Console shows what you were actually billed.
 
 **Hosting (Render).** The free plan costs nothing, and so does a free Neon database. A paid instance with a disk has a monthly price; see [Render's pricing page](https://render.com/pricing).
 
 To keep spending under control:
 
-- Set a credit limit on the key in your OpenRouter account.
+- Set a monthly spend limit in the Anthropic Console, under Limits.
 - Keep `APP_PASSWORD` set on any copy that others can reach.
 - Leave `MAX_ACTIVE_RUNS` low.
 
@@ -510,9 +510,9 @@ To keep spending under control:
 
 - **One shared password.** A deployed copy has a single username and password. Everyone who knows them can see all runs and start new ones. There are no separate user accounts.
 - **The password travels with every request.** This is safe on Render, which serves the app over HTTPS. Do not expose the app over plain HTTP on a network you do not trust.
-- **The book text leaves your computer.** It is sent to OpenRouter, which passes it to the company that runs the model you chose. Do not load texts you are not allowed to share.
+- **The book text leaves your computer.** It is sent to Anthropic, which runs the Claude models. Do not load texts you are not allowed to share.
 - **The API key is never in the code.** It lives in `.env` on your computer, which Git ignores, or in Render's environment settings.
-- **If a key may have leaked, replace it.** Delete it in your OpenRouter account, create a new one, and update `.env` and Render.
+- **If a key may have leaked, replace it.** Delete it in the Anthropic Console, create a new one, and update `.env` and Render.
 - **Book text is shown as text.** The page never treats book content as web code, so nothing in a book file can run in the browser.
 
 ---
@@ -521,9 +521,9 @@ To keep spending under control:
 
 | What you see | Likely cause | What to do |
 |---|---|---|
-| "The OpenRouter API key is not set" on the page | `OPENROUTER_API_KEY` is missing | Add it to `.env` and restart, or add it on Render's **Environment** page. |
-| A run fails with "OpenRouter rejected the API key" | The key is wrong or was deleted | Create a new key and update it. |
-| A run fails with "out of credits" | The OpenRouter account has no credit | Add credit in your OpenRouter account. |
+| "The Anthropic API key is not set" on the page | `ANTHROPIC_API_KEY` is missing | Add it to `.env` and restart, or add it on Render's **Environment** page. |
+| A run fails with "Anthropic rejected the API key" | The key is wrong or was deleted | Create a new key and update it. |
+| A run fails with "out of credits" | The Anthropic account has no credit | Add credit in the Anthropic Console, under Billing. |
 | The browser keeps asking for the password | Wrong username or password | The username is `veda` unless you changed `APP_USERNAME`. Copy the password from Render's **Environment** page. |
 | The page takes a minute to open on Render | The free service was asleep | Wait. It only happens on the first visit after a quiet spell. |
 | Past runs have disappeared on Render | The free plan clears files on every restart | See [Keeping runs permanently](#keeping-runs-permanently). |
@@ -561,7 +561,7 @@ agent/
   agents/
     analyst.py, labeler.py, reviewer.py   Each agent and its tools
     deps.py            Shared state: pieces, labels, usage, trace
-    models.py          Which model each agent uses, through OpenRouter
+    models.py          Which model each agent uses, through the Claude API
   orchestrator.py    Runs one book from start to finish
   jobs.py            One folder per run
   plan.py            The plan screen's data: outline, kinds of text, previews in every shape, what changed
@@ -611,7 +611,7 @@ uv run pytest
 ### Scoring real runs
 
 ```bash
-uv run python -m eval.bakeoff --book examples/mandala-brahmana --models openai/gpt-6-luna,openai/gpt-5.6-luna --repeat 3
+uv run python -m eval.bakeoff --book examples/mandala-brahmana --models claude-opus-5-5,claude-sonnet-5-5 --repeat 3
 uv run python -m eval.score jobs/<run>/output.csv examples/mandala-brahmana
 ```
 
@@ -637,7 +637,7 @@ When a run makes a mistake, the most durable fix has been a new check in `assemb
 
 ### Adding a model to the page
 
-Edit the `MODELS` list in `web/app.py`. Any OpenRouter model that supports tool calling can be listed. Test it with `eval.bakeoff` first.
+Edit the `MODELS` list in `web/app.py`. Any Claude model can be listed; add its prices to `PRICES` in `agent/agents/models.py` so runs show their cost. Test it with `eval.bakeoff` first.
 
 ### The web server's addresses
 
@@ -665,7 +665,7 @@ Limits: book text up to 5,000,000 characters, request up to 20,000, example rows
 
 **Limits today**
 
-- **Two books, one model.** Measured on the Mandala Brahmana sample and 24 pages of the Chandogya Upanishad (three levels, page locators, scrambled OCR order), with GPT-6 Luna. Four- and five-level books are covered only by code tests until a real one is tried.
+- **Two books, one model, not yet on Claude.** Measured on the Mandala Brahmana sample and 24 pages of the Chandogya Upanishad (three levels, page locators, scrambled OCR order), with GPT-6 Luna before the switch to Claude. Four- and five-level books are covered only by code tests until a real one is tried.
 - **Text the OCR scrambled inside one unit is not reordered.** If the second half of a mantra is read before its first half, code keeps the OCR order and lists it for review: code never moves text.
 - **Numbered units only.** Each shloka, mantra or sutra must end with its printed number. Books of unnumbered prose with side notes are not supported.
 - **No fixing in the page.** You correct the downloaded file by hand.

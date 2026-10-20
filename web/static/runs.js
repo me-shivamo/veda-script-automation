@@ -23,7 +23,7 @@ export async function renderRuns(view, config) {
     return;
   }
   list.replaceChildren(...runs.map((run) => {
-    const meta = [when(run.created), run.rows !== null && run.rows !== undefined ? plural(run.rows, "row") : null, run.cost_usd ? money(run.cost_usd) : null, run.model]
+    const meta = [when(run.created), run.rows !== null && run.rows !== undefined ? plural(run.rows, "row") : null, run.cost_usd ? money(run.cost_usd) : null, String(run.model || "").replace(/^subscription\/(.*)$/, "$1 (Claude plan)")]
       .filter(Boolean).join(" · ");
     return el("a", { class: "runrow", href: `#/runs/${run.id}` },
       el("div", {}, el("div", { class: "runrow__name", text: run.name }), el("div", { class: "runrow__meta", text: meta })),

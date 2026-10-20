@@ -161,7 +161,7 @@ function requestStep(view, config) {
       el("div", { class: "field-row" },
         el("div", {}, el("label", { class: "field-label", text: "Name of this run" }), name),
         el("div", {}, el("label", { class: "field-label", text: "Model" }), model)),
-      el("p", { class: "hint", text: "Opus 5.5 is the most capable and costs the most; Haiku 5.5 costs the least. Each run shows what it cost when it ends." }),
+      el("p", { class: "hint", text: "“Your Claude plan” runs through Claude Code on this computer and counts towards your plan's usage limits. “API key” is billed per run, and the run shows its cost when it ends." }),
       el("label", { class: "check" }, ask, " Show me the plan before the full run (recommended)"),
       el("div", { class: "actions" },
         el("button", { class: "button button--lg button--outline", type: "button", text: "Back", onclick: () => goStep(view, config, 1) }),

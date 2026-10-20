@@ -59,7 +59,7 @@ export async function renderOutput(root, id, { tab = "output", source = null } =
     ["To review", review.length.toLocaleString(), review.length > 0],
     ["Lines left out", result.removed.length.toLocaleString(), false],
     ["Time", duration(summary.seconds) || "–", false],
-    ["Cost", money(summary.cost_usd), false],
+    ["Cost", String(summary.models?.labeler || "").startsWith("subscription/") ? "Claude plan" : money(summary.cost_usd), false],
   ].map(([label, value, attention]) => el("div", { class: `tile${attention ? " tile--attention" : ""}` }, el("b", { text: value }), el("span", { text: label }))));
 
   const files = [

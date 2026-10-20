@@ -1,16 +1,19 @@
 // The Claude connection dialog: your Claude Pro or Max plan through Claude Code, or an API key.
 // It can only change anything on a copy running on your own computer; the values go to the .env file there.
+// A hosted copy takes them from the host's settings, and the dialog only shows and tests them.
 
 import { $, el, post } from "./ui.js";
 
 let onChange = () => {};
+let current = null;
 
 export function setupConnection(config, changed) {
   onChange = changed;
+  current = config.connection;
   const dialog = $("connection");
-  $("connectionButton").hidden = !config.connection.local;
+  $("connectionButton").hidden = false;
   for (const opener of document.querySelectorAll("[data-open-connection]")) {
-    opener.addEventListener("click", () => { render(dialog, config.connection); dialog.showModal(); });
+    opener.addEventListener("click", () => { render(dialog, current); dialog.showModal(); });
   }
   dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); });
 }
@@ -20,13 +23,34 @@ function render(dialog, connection) {
     el("h2", { id: "connectionTitle", text: "Claude connection" }),
     el("button", { class: "iconbutton iconbutton--light", type: "button", "aria-label": "Close", text: "×", onclick: () => dialog.close() }));
   if (!connection.local) {
-    dialog.replaceChildren(head, el("p", { class: "lead", text: "This copy is reachable by other people, so it runs only with the API key in its settings (ANTHROPIC_API_KEY). A Claude plan can be used only on a copy running on your own computer." }));
+    dialog.replaceChildren(head, hostedSection(connection));
     return;
   }
   dialog.replaceChildren(head,
     el("p", { class: "lead", text: "Runs can use your Claude Pro or Max plan through Claude Code on this computer, or an Anthropic API key, which is billed for each run. What you save here stays in the .env file on this computer." }),
     planSection(dialog, connection),
     apiSection(dialog, connection));
+}
+
+// A copy on a host: the connection comes from the host's settings, so this only shows and tests it.
+function hostedSection(connection) {
+  const message = el("p", { class: "hint", role: "status" });
+  const status = (label, ok, text) => el("h3", {}, `${label} `, el("span", { class: `pill ${ok ? "pill--ok" : ""}`, text }));
+  return el("div", {},
+    el("p", { class: "lead", text: "On a hosted copy, the connection is set on the host's Environment page (on Render: the service's Environment tab), and the copy restarts with it." }),
+    el("section", { class: "fieldset connection" },
+      status("Your Claude plan", connection.plan, connection.plan ? "Token set" : connection.plan_allowed ? "No token set" : "Not allowed here"),
+      connection.plan_allowed
+        ? el("p", { class: "hint" }, "Set ", el("code", { text: "CLAUDE_CODE_OAUTH_TOKEN" }), " to the token that ", el("code", { text: "claude setup-token" }), " prints on your computer.")
+        : el("p", { class: "hint" }, "Only for a copy that you alone use: set ", el("code", { text: "ALLOW_CLAUDE_PLAN" }), " to 1, keep ", el("code", { text: "APP_PASSWORD" }), " set and never share it, and set ", el("code", { text: "CLAUDE_CODE_OAUTH_TOKEN" }), " to the token that ", el("code", { text: "claude setup-token" }), " prints. Anthropic does not allow a Claude plan to serve other people."),
+      connection.plan_allowed ? el("div", { class: "connection__actions" },
+        el("button", { class: "button button--sm button--outline", type: "button", text: "Test the connection", onclick: () => test("plan", message) })) : null),
+    el("section", { class: "fieldset connection" },
+      status("API key", connection.api_key, connection.api_key ? `Set, ends in …${connection.api_key_end}` : "None set"),
+      el("p", { class: "hint" }, "Set ", el("code", { text: "ANTHROPIC_API_KEY" }), " for runs billed to an Anthropic account."),
+      el("div", { class: "connection__actions" },
+        el("button", { class: "button button--sm button--outline", type: "button", text: "Test the key", disabled: !connection.api_key, onclick: () => test("api", message) }))),
+    message);
 }
 
 function planSection(dialog, connection) {
@@ -77,6 +101,7 @@ async function save(dialog, change, message, testAfter) {
   }
   try {
     const connection = await post("/api/connection", change);
+    current = connection;
     await onChange();
     render(dialog, connection);
   } catch (error) {
